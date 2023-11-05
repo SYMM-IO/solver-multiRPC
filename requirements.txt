@@ -1,0 +1,4 @@
+web3>=6.0.0
+eth-abi>=4.0.0-b.2
+multicallable>=6.0.0
+requests>=2.31.0
