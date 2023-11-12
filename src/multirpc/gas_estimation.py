@@ -9,8 +9,8 @@ from requests import JSONDecodeError, RequestException, ReadTimeout
 from web3 import Web3, AsyncWeb3
 from web3.types import Wei
 
-from src.multirpc.exceptions import OutOfRangeTransactionFee, FailedToGetGasPrice
-from src.multirpc.utils import TxPriority
+from .exceptions import OutOfRangeTransactionFee, FailedToGetGasPrice
+from .utils import TxPriority
 from .constants import ChainIdToGas, FixedValueGas, DEFAULT_API_PROVIDER, GasEstimationMethod
 
 

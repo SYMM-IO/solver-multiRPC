@@ -25,12 +25,26 @@ Here's a quick example to get you started:
 import asyncio
 import json
 from multirpc import MultiRpc
+from src.multirpc.utils import NestedDict
+
 
 async def main():
-    rpcs = ['https://rpcapi.fantom.network', 'https://rpc2.fantom.network', 'https://rpc.ankr.com/fantom']
+    rpcs = NestedDict({
+        "view": {
+            1: ['https://1rpc.io/ftm', 'https://rpcapi.fantom.network', 'https://rpc3.fantom.network'],
+            2: ['https://rpc.fantom.network', 'https://rpc2.fantom.network', ],
+            3: ['https://rpc.ankr.com/fantom'],
+        },
+        "transaction": {
+            1: ['https://1rpc.io/ftm', 'https://rpcapi.fantom.network', 'https://rpc3.fantom.network'],
+            2: ['https://rpc.fantom.network', 'https://rpc2.fantom.network', ],
+            3: ['https://rpc.ankr.com/fantom'],
+        }
+    })
     with open("abi.json", "r") as f:
         abi = json.load(f)
-    multi_rpc = MultiRpc(rpcs, contract_address='YOUR_CONTRACT_ADDRESS', contract_abi=abi)
+    multi_rpc = MultiRpc(rpcs, 'YOUR_CONTRACT_ADDRESS', contract_abi=abi, enable_gas_estimation=True)
+
     await multi_rpc.setup()
     multi_rpc.set_account("YOUR_PUBLIC_ADDRESS", "YOUR_PRIVATE_KEY")
     result = await multi_rpc.functions.YOUR_FUNCTION().call()

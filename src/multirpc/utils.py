@@ -9,8 +9,8 @@ from typing import Dict, List, Tuple, Union
 import web3
 from web3 import Web3, AsyncWeb3
 
-from src.multirpc.constants import MaxRPCInEachBracket
-from src.multirpc.exceptions import MaximumRPCInEachBracketReached, AtLastProvideOneValidRPCInEachBracket
+from .constants import MaxRPCInEachBracket
+from .exceptions import MaximumRPCInEachBracketReached, AtLastProvideOneValidRPCInEachBracket
 
 
 def get_span_proper_label_from_provider(endpoint_uri):
