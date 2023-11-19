@@ -265,7 +265,9 @@ class MultiRpc:
                     'nonce too low' in str(e).lower() or
                     'already known' in str(e).lower() or
                     'transaction underpriced' in str(e).lower() or
-                    'account suspended' in str(e).lower()
+                    'account suspended' in str(e).lower() or
+                    'account suspended' in str(e).lower() or
+                    'exceeds the configured cap' in str(e).lower()
             ):
                 logging.exception("_send_transaction_exception")
                 raise
