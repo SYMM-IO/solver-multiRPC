@@ -1,1 +1,1 @@
-from .multi_rpc_interface import MultiRpc
+from .base_multi_rpc_interface import BaseMultiRpc

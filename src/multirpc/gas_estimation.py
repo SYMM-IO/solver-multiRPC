@@ -11,7 +11,7 @@ from web3.types import Wei
 
 from .exceptions import OutOfRangeTransactionFee, FailedToGetGasPrice
 from .utils import TxPriority
-from .constants import ChainIdToGas, FixedValueGas, DEFAULT_API_PROVIDER, GasEstimationMethod
+from .constants import ChainIdToGas, FixedValueGas, DEFAULT_API_PROVIDER, GasEstimationMethod, RequestTimeout, DevEnv
 
 
 class GasEstimation:
@@ -70,8 +70,9 @@ class GasEstimation:
 
     async def _get_gas_from_api(self, priority: TxPriority, gas_upper_bound: Union[float, Decimal]) -> Dict[str, Wei]:
         gas_provider = self.gas_api_provider.format(chain_id=self.chain_id)
+        resp = None
         try:
-            resp = requests.get(gas_provider)
+            resp = requests.get(gas_provider, timeout=RequestTimeout)
             resp_json = resp.json()
             max_fee_per_gas = Decimal(resp_json[priority]["suggestedMaxFeePerGas"])
             max_priority_fee_per_gas = Decimal(resp_json[priority]["suggestedMaxPriorityFeePerGas"])
@@ -90,6 +91,8 @@ class GasEstimation:
             }
             return gas_params
         except (RequestException, JSONDecodeError, KeyError):
+            if not DevEnv:
+                logging.exception(f'Failed to get gas info from metaswap {resp.status_code=}')
             raise FailedToGetGasPrice("Failed to get gas info from api")
 
     async def _get_gas_from_rpc(self, priority: TxPriority, gas_upper_bound: Union[float, Decimal]) -> Dict[str, Wei]:

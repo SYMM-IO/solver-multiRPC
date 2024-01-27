@@ -15,3 +15,5 @@ class GasEstimationMethod(enum.Enum):
 
 
 MaxRPCInEachBracket = 3
+RequestTimeout = 30
+DevEnv = True

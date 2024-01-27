@@ -36,3 +36,7 @@ class AtLastProvideOneValidRPCInEachBracket(Web3InterfaceException):
 
 class TransactionValueError(Web3InterfaceException):
     pass
+
+
+class GetBlockFailed(Web3InterfaceException):
+    pass

@@ -6,8 +6,10 @@ import time
 from functools import reduce
 from typing import Dict, List, Tuple, Union
 
+import aiohttp.client_exceptions
 import web3
 from web3 import Web3, AsyncWeb3
+from web3.middleware import async_geth_poa_middleware
 
 from .constants import MaxRPCInEachBracket
 from .exceptions import MaximumRPCInEachBracketReached, AtLastProvideOneValidRPCInEachBracket
@@ -68,16 +70,18 @@ class NestedDict:
         return json.dumps(self.data, indent=1)
 
 
-async def create_web3_from_rpc(rpc_urls: NestedDict) -> NestedDict:
+async def create_web3_from_rpc(rpc_urls: NestedDict, is_proof_of_authority: bool) -> NestedDict:
     async def create_web3(rpc: str):
         async_w3: AsyncWeb3
         if rpc.startswith("http"):
             async_w3 = web3.AsyncWeb3(Web3.AsyncHTTPProvider(rpc))
         else:
             async_w3 = web3.AsyncWeb3(Web3.WebsocketProvider(rpc))
+        if is_proof_of_authority:
+            async_w3.middleware_onion.inject(async_geth_poa_middleware, layer=0)
         try:
             status = await async_w3.is_connected()
-        except asyncio.exceptions.TimeoutError:
+        except (asyncio.exceptions.TimeoutError, aiohttp.client_exceptions.ClientResponseError):
             status = False
         return async_w3, status
 
