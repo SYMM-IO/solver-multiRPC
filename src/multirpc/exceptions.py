@@ -40,3 +40,7 @@ class TransactionValueError(Web3InterfaceException):
 
 class GetBlockFailed(Web3InterfaceException):
     pass
+
+
+class DontHaveThisRpcType(Web3InterfaceException):
+    pass

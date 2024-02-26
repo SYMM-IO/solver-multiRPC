@@ -1,5 +1,5 @@
 import logging
-from typing import Union, Dict, Optional, TypeVar
+from typing import Union, Dict, Optional
 
 from eth_typing import Address, ChecksumAddress
 from web3._utils.contracts import encode_transaction_data  # noqa
@@ -7,18 +7,11 @@ from web3.types import BlockData, BlockIdentifier, TxReceipt
 
 from . import BaseMultiRpc
 from .base_multi_rpc_interface import BaseContractFunction
+from .exceptions import DontHaveThisRpcType
 from .gas_estimation import GasEstimation, GasEstimationMethod
-from .utils import TxPriority, NestedDict
+from .utils import TxPriority, NestedDict, ContractFunctionType
 
 logging.basicConfig(level=logging.INFO)
-
-
-class ContractFunctionType:
-    View = "view"
-    Transaction = "transaction"
-
-
-T = TypeVar("T")
 
 
 class AsyncMultiRpc(BaseMultiRpc):
@@ -81,6 +74,8 @@ class AsyncMultiRpc(BaseMultiRpc):
                 block_identifier: Union[str, int] = 'latest',
                 enable_gas_estimation: Optional[bool] = None,
         ):
+            if self.mr.providers.get(self.typ) is None:
+                raise DontHaveThisRpcType(f"Doesn't have {self.typ} RPCs")
             if self.typ == ContractFunctionType.View:
                 return await self.mr._call_view_function(
                     self.name, block_identifier, *self.args, **self.kwargs,

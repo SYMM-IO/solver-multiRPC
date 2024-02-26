@@ -29,6 +29,11 @@ class TxPriority(enum.Enum):
     High = "high"
 
 
+class ContractFunctionType:
+    View = "view"
+    Transaction = "transaction"
+
+
 class NestedDict:
     def __init__(self, data: Dict = None):
         if data is None:
@@ -52,6 +57,17 @@ class NestedDict:
                 current_dict[key] = {}
             current_dict = current_dict[key]
         current_dict[keys[-1]] = value
+
+    def get(self, keys, default=None):
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        current_dict = self.data
+        for key in keys:
+            try:
+                current_dict = current_dict[key]
+            except KeyError:
+                return default
+        return current_dict
 
     def items(self):
         def get_items_recursive(data, current_keys=()):

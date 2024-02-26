@@ -22,18 +22,13 @@ from web3.types import BlockData, BlockIdentifier, TxReceipt
 from .exceptions import (
     FailedOnAllRPCs,
     TransactionFailedStatus,
-    Web3InterfaceException, TransactionValueError, GetBlockFailed,
+    Web3InterfaceException, TransactionValueError, GetBlockFailed, DontHaveThisRpcType,
 )
 from .gas_estimation import GasEstimation, GasEstimationMethod
 from .utils import TxPriority, get_span_proper_label_from_provider, get_unix_time, NestedDict, create_web3_from_rpc, \
     calculate_chain_id, reduce_list_of_list
 
 logging.basicConfig(level=logging.INFO)
-
-
-class ContractFunctionType:
-    View = "view"
-    Transaction = "transaction"
 
 
 T = TypeVar("T")
@@ -99,7 +94,7 @@ class BaseMultiRpc(ABC):
         self.providers = await create_web3_from_rpc(self.rpc_urls, self.is_proof_authority)
         self.chain_id = await calculate_chain_id(self.providers)
 
-        if self.gas_estimation is None:
+        if self.gas_estimation is None and self.providers.get('transaction'):
             self.gas_estimation = GasEstimation(
                 self.chain_id,
                 reduce_list_of_list(self.providers['transaction'].values()),
@@ -184,7 +179,9 @@ class BaseMultiRpc(ABC):
 
     async def _get_nonce(self, address: Union[Address, ChecksumAddress, str]) -> int:
         address = Web3.to_checksum_address(address)
-        for providers in self.providers['view'].values():
+        providers_4_nonce = self.providers['transaction'] if self.providers.get('view') is None else self.providers['view']
+
+        for providers in providers_4_nonce.values():
             execution_list = [
                 prov.eth.get_transaction_count(address) for prov in providers
             ]
@@ -413,6 +410,10 @@ class BaseMultiRpc(ABC):
                 pass
         raise Web3InterfaceException("All of RPCs raise exception.")
 
+    def check_for_view(self):
+        if self.providers.get('view') is None:
+            raise DontHaveThisRpcType(f"Doesn't have view RPCs")
+
     async def get_tx_receipt(self, tx_hash) -> TxReceipt:
         async def _get_tx_receipt(p: AsyncWeb3, transaction_hash, cancel_event: asyncio.Event) -> TxReceipt:
             try:
@@ -421,6 +422,8 @@ class BaseMultiRpc(ABC):
                 return receipt
             except Exception:
                 raise
+
+        self.check_for_view()
 
         exceptions = (HTTPError, ConnectionError, ReadTimeout, ValueError, TimeExhausted, TransactionNotFound)
 
@@ -450,6 +453,8 @@ class BaseMultiRpc(ABC):
                 return receipt
             except Exception:
                 raise
+
+        self.check_for_view()
 
         exceptions = (HTTPError, ConnectionError, ReadTimeout, ValueError, TimeExhausted, BlockNotFound)
 
