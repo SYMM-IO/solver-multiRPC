@@ -19,7 +19,18 @@ class ViewCallFailed(Web3InterfaceException):
 
 
 class TransactionFailedStatus(Web3InterfaceException):
-    pass
+    def __init__(self, hex_tx_hash, func_name=None, func_args=None, func_kwargs=None, trace=None):
+        self.hex_tx_hash = hex_tx_hash
+        self.func_name = func_name
+        self.func_args = func_args
+        self.func_kwargs = func_kwargs
+        self.trace = trace
+
+    def __str__(self):
+        return f'{self.__class__.__name__}({self.hex_tx_hash} func={self.func_name})'
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}({self.hex_tx_hash} func={self.func_name})'
 
 
 class FailedToGetGasPrice(Web3InterfaceException):

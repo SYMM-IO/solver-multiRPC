@@ -1,5 +1,5 @@
 import logging
-from typing import Union, Dict, Optional
+from typing import Union, Dict, Optional, List
 
 from eth_typing import Address, ChecksumAddress
 from web3._utils.contracts import encode_transaction_data  # noqa
@@ -54,6 +54,9 @@ class AsyncMultiRpc(BaseMultiRpc):
 
     async def get_block(self, block_identifier: BlockIdentifier, full_transactions: bool = False) -> BlockData:
         return await super().get_block(block_identifier, full_transactions)
+
+    async def get_block_number(self) -> List[int]:
+        return await super().get_block_number()
 
     class ContractFunction(BaseContractFunction):
         def __call__(self, *args, **kwargs):

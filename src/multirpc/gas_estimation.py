@@ -5,13 +5,14 @@ from typing import Callable, Union
 from typing import List, Dict, Optional
 
 import requests
-from requests import JSONDecodeError, RequestException, ReadTimeout
+from requests import JSONDecodeError, RequestException, ReadTimeout, ConnectionError
 from web3 import Web3, AsyncWeb3
 from web3.types import Wei
 
+from .constants import ChainIdToGas, FixedValueGas, DEFAULT_API_PROVIDER, GasEstimationMethod, RequestTimeout, DevEnv, \
+    GasFromRpcChainIds
 from .exceptions import OutOfRangeTransactionFee, FailedToGetGasPrice
 from .utils import TxPriority
-from .constants import ChainIdToGas, FixedValueGas, DEFAULT_API_PROVIDER, GasEstimationMethod, RequestTimeout, DevEnv
 
 
 class GasEstimation:
@@ -107,7 +108,7 @@ class GasEstimation:
                 if gas_price / 1e9 <= gas_upper_bound:
                     found_gas_below_upper_bound = True
                     break
-            except (ConnectionError, ReadTimeout) as e:
+            except (ConnectionError, ReadTimeout, ValueError) as e:
                 logging.error(f"Failed to get gas price from {rpc_url}, {e=}")
 
         if gas_price is None:
@@ -136,6 +137,9 @@ class GasEstimation:
             except FailedToGetGasPrice as e:
                 raise e
         gas_params = {}
+
+        if DevEnv or self.chain_id in GasFromRpcChainIds:
+            return await self._get_gas_from_rpc(priority, gas_upper_bound)
         for method_key in self.method_sorted_priority:
             try:
                 gas_params = await self.gas_estimation_method[method_key](priority, gas_upper_bound)
