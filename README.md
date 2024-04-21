@@ -9,6 +9,7 @@
 - **Robust Error Handling**: Designed to handle failures gracefully, increasing the reliability of your applications.
 - **Easy-to-use API**: Interact with Ethereum smart contracts using a simple and intuitive API.
 
+
 ## Installation
 
 Install `solver-MultiRpc` using pip:
