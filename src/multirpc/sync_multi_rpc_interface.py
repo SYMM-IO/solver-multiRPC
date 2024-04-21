@@ -38,6 +38,7 @@ class MultiRpc(BaseMultiRpc):
             apm=None,
             enable_gas_estimation: bool = False,
             is_proof_authority: bool = False,
+            multicall_custom_address: str = None
     ):
         super().__init__(rpc_urls, contract_address, contract_abi, gas_estimation, gas_limit, gas_upper_bound, apm,
                          enable_gas_estimation, is_proof_authority)
@@ -53,7 +54,7 @@ class MultiRpc(BaseMultiRpc):
                 func_abi["name"],
                 self.ContractFunction(func_abi["name"], func_abi, self, function_type),
             )
-        asyncio.run(self.setup())
+        asyncio.run(self.setup(custom_address=multicall_custom_address))
 
     def get_nonce(self, address: Union[Address, ChecksumAddress, str]) -> int:
         return asyncio.run(super()._get_nonce(address))

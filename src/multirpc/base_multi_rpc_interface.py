@@ -1,18 +1,17 @@
 import asyncio
 import logging
 import time
+import web3
 from abc import ABC
 from concurrent.futures import ThreadPoolExecutor
-from time import sleep
-from typing import List, Union, Tuple, Coroutine, Dict, Optional, Callable, TypeVar
-
-import web3
 from eth_account import Account
 from eth_account.datastructures import SignedTransaction
 from eth_account.signers.local import LocalAccount
 from eth_typing import Address, ChecksumAddress
 from multicallable.async_multicallable import AsyncCall, AsyncMulticall
 from requests import ConnectionError, ReadTimeout, HTTPError
+from time import sleep
+from typing import List, Union, Tuple, Coroutine, Dict, Optional, Callable, TypeVar
 from web3 import Web3, AsyncWeb3
 from web3._utils.contracts import encode_transaction_data  # noqa
 from web3.contract import Contract
@@ -95,7 +94,7 @@ class BaseMultiRpc(ABC):
         self.address = Web3.to_checksum_address(address)
         self.private_key = private_key
 
-    async def setup(self) -> None:
+    async def setup(self, multicall_custom_address: str = None) -> None:
         self.providers = await create_web3_from_rpc(self.rpc_urls, self.is_proof_authority)
         self.chain_id = await calculate_chain_id(self.providers)
 
@@ -114,7 +113,7 @@ class BaseMultiRpc(ABC):
                 rpc_url = wb3.provider.endpoint_uri
                 try:
                     mc = AsyncMulticall()
-                    await mc.setup(w3=wb3)
+                    await mc.setup(w3=wb3, custom_address=multicall_custom_address)
                     multi_calls.append(mc)
                     contracts.append(
                         wb3.eth.contract(self.contract_address, abi=self.contract_abi)
