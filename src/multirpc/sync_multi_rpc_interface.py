@@ -54,7 +54,7 @@ class MultiRpc(BaseMultiRpc):
                 func_abi["name"],
                 self.ContractFunction(func_abi["name"], func_abi, self, function_type),
             )
-        asyncio.run(self.setup(custom_address=multicall_custom_address))
+        asyncio.run(self.setup(multicall_custom_address=multicall_custom_address))
 
     def get_nonce(self, address: Union[Address, ChecksumAddress, str]) -> int:
         return asyncio.run(super()._get_nonce(address))
