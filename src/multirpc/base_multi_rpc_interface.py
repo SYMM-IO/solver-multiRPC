@@ -198,9 +198,7 @@ class BaseMultiRpc(ABC):
     async def _get_nonce(self, address: Union[Address, ChecksumAddress, str]) -> int:
         mrpc_cntr.incr_cur_func()
         address = Web3.to_checksum_address(address)
-        providers_4_nonce = self.providers['transaction'] if self.providers.get('view') is None else self.providers[
-            'view']
-
+        providers_4_nonce = self.providers.get('view') or self.providers['transaction']
         for providers in providers_4_nonce.values():
             execution_list = [
                 prov.eth.get_transaction_count(address) for prov in providers
