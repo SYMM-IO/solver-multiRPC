@@ -8,6 +8,7 @@ from web3.types import BlockData, BlockIdentifier, TxReceipt
 
 from . import BaseMultiRpc
 from .base_multi_rpc_interface import BaseContractFunction
+from .constants import ViewPolicy
 from .exceptions import DontHaveThisRpcType
 from .gas_estimation import GasEstimation, GasEstimationMethod
 from .utils import TxPriority, NestedDict, ContractFunctionType
@@ -25,6 +26,7 @@ class MultiRpc(BaseMultiRpc):
             rpc_urls: NestedDict,
             contract_address: Union[Address, ChecksumAddress, str],
             contract_abi: Dict,
+            view_policy: ViewPolicy = ViewPolicy.MostUpdated,
             gas_estimation: Optional[GasEstimation] = None,
             gas_limit: int = 1_000_000,
             gas_upper_bound: int = 26_000,
@@ -33,8 +35,8 @@ class MultiRpc(BaseMultiRpc):
             is_proof_authority: bool = False,
             multicall_custom_address: str = None
     ):
-        super().__init__(rpc_urls, contract_address, contract_abi, gas_estimation, gas_limit, gas_upper_bound, apm,
-                         enable_gas_estimation, is_proof_authority)
+        super().__init__(rpc_urls, contract_address, contract_abi, view_policy, gas_estimation, gas_limit,
+                         gas_upper_bound, apm, enable_gas_estimation, is_proof_authority)
 
         for func_abi in self.contract_abi:
             if func_abi.get("stateMutability") in ("view", "pure"):

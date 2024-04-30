@@ -1,28 +1,29 @@
 import asyncio
 import logging
 import time
-import web3
 from abc import ABC
 from concurrent.futures import ThreadPoolExecutor
+from time import sleep
+from typing import List, Union, Tuple, Coroutine, Dict, Optional, Callable, TypeVar
+
+import web3
 from eth_account import Account
 from eth_account.datastructures import SignedTransaction
 from eth_account.signers.local import LocalAccount
 from eth_typing import Address, ChecksumAddress
 from multicallable.async_multicallable import AsyncCall, AsyncMulticall
 from requests import ConnectionError, ReadTimeout, HTTPError
-from time import sleep
-from typing import List, Union, Tuple, Coroutine, Dict, Optional, Callable, TypeVar
 from web3 import Web3, AsyncWeb3
 from web3._utils.contracts import encode_transaction_data  # noqa
 from web3.contract import Contract
 from web3.exceptions import TimeExhausted, TransactionNotFound, BlockNotFound
 from web3.types import BlockData, BlockIdentifier, TxReceipt
 
-from .constants import mrpc_cntr
+from .constants import mrpc_cntr, ViewPolicy
 from .exceptions import (
     FailedOnAllRPCs,
     TransactionFailedStatus,
-    Web3InterfaceException, TransactionValueError, GetBlockFailed, DontHaveThisRpcType,
+    Web3InterfaceException, TransactionValueError, GetBlockFailed, DontHaveThisRpcType, NotValidViewPolicy,
 )
 from .gas_estimation import GasEstimation, GasEstimationMethod
 from .utils import TxPriority, get_span_proper_label_from_provider, get_unix_time, NestedDict, create_web3_from_rpc, \
@@ -43,6 +44,7 @@ class BaseMultiRpc(ABC):
             rpc_urls: NestedDict,
             contract_address: Union[Address, ChecksumAddress, str],
             contract_abi: Dict,
+            view_policy: ViewPolicy = ViewPolicy.MostUpdated,
             gas_estimation: Optional[GasEstimation] = None,
             gas_limit: int = 1_000_000,
             gas_upper_bound: int = 26_000,
@@ -63,6 +65,7 @@ class BaseMultiRpc(ABC):
 
         self.functions = type("functions", (object,), {})()
 
+        self.view_policy = view_policy
         self.gas_limit = gas_limit
         self.gas_upper_bound = gas_upper_bound
         self.enable_gas_estimation = enable_gas_estimation
@@ -127,8 +130,11 @@ class BaseMultiRpc(ABC):
         if not is_rpc_provided:
             raise ValueError("No available rpc provided")
 
+
+
     @staticmethod
-    async def __gather_tasks(execution_list: List[Coroutine]) -> List[any]:
+    async def __gather_tasks(execution_list: List[Coroutine], view_policy: ViewPolicy = ViewPolicy.MostUpdated) \
+            -> List[any]:
         """
         Get an execution list and wait for all to end. If all executable raise an exception, it will raise a
         'Web3InterfaceException' exception, otherwise returns all results which has no exception
@@ -138,18 +144,27 @@ class BaseMultiRpc(ABC):
         Returns:
 
         """
+
         mrpc_cntr.incr_cur_func()
-        with ThreadPoolExecutor() as executor:
-            base_results = executor.map(asyncio.run, execution_list)
-        results = [res for res in base_results if not isinstance(res, Exception)]
-        if len(results) == 0:
-            exceptions = [res for res in base_results if isinstance(res, Exception)]
-            for exc in exceptions:
-                logging.exception(exc)
-            raise FailedOnAllRPCs(
-                f"All of RPCs raise exception. first exception: {exceptions[0]}"
-            )
-        return results
+
+        if view_policy == view_policy.MostUpdated:          # wait for all task to be completed
+            with ThreadPoolExecutor() as executor:
+                base_results = executor.map(asyncio.run, execution_list)
+            results = [res for res in base_results if not isinstance(res, Exception)]
+            if len(results) == 0:
+                exceptions = [res for res in base_results if isinstance(res, Exception)]
+                for exc in exceptions:
+                    logging.exception(exc)
+                raise FailedOnAllRPCs(f"All of RPCs raise exception. first exception: {exceptions[0]}")
+            return results
+        elif view_policy == view_policy.FirstSuccess:       # wait to at least 1 task completed
+            return [await BaseMultiRpc.__execute_batch_tasks(
+                execution_list,
+                [HTTPError, ConnectionError],
+                FailedOnAllRPCs
+            )]
+
+        raise NotValidViewPolicy()
 
     async def __call_view_function(self,
                                    func_name: str,
@@ -175,7 +190,7 @@ class BaseMultiRpc(ABC):
             execution_list = [mc.call([call], block_identifier=block_identifier) for mc, call in
                               zip(multi_calls, calls)]
             try:
-                return await self.__gather_tasks(execution_list)
+                return await self.__gather_tasks(execution_list, view_policy=self.view_policy)
             except (Web3InterfaceException, asyncio.TimeoutError):
                 logging.info(f"Can't call view function from this list of rpc({rpc_bracket})")
         raise Web3InterfaceException("All of RPCs raise exception.")
@@ -236,8 +251,7 @@ class BaseMultiRpc(ABC):
             mrpc_cntr(f'unknown ex {e.__class__.__name__}')
             raise
 
-    async def _send_transaction(self, provider: web3.AsyncWeb3, raw_transaction: any,
-                                cancel_event: asyncio.Event) -> Tuple[AsyncWeb3, any]:
+    async def _send_transaction(self, provider: web3.AsyncWeb3, raw_transaction: any) -> Tuple[AsyncWeb3, any]:
         mrpc_cntr.incr_cur_func()
         rpc_url = provider.provider.endpoint_uri
         try:
@@ -245,7 +259,6 @@ class BaseMultiRpc(ABC):
             transaction = await provider.eth.send_raw_transaction(raw_transaction)
             self._logger_params(**{f"{rpc_label_prefix}_post_send_time": get_unix_time()})
             self._logger_params(tx_send_time=int(time.time() * 1000))
-            cancel_event.set()
             mrpc_cntr('_send_transaction end')
             return provider, transaction
         except ValueError as e:
@@ -294,8 +307,7 @@ class BaseMultiRpc(ABC):
         pass
 
     async def _wait_and_get_tx_receipt(self, provider: AsyncWeb3, tx, timeout: float,
-                                       func_name: str, func_args: List, func_kwargs: Dict,
-                                       cancel_event: asyncio.Event) -> AsyncWeb3:
+                                       func_name: str, func_args: Tuple, func_kwargs: Dict) -> AsyncWeb3:
         mrpc_cntr.incr_cur_func()
         con_err_count = tx_err_count = 0
         rpc_url = provider.provider.endpoint_uri
@@ -305,7 +317,6 @@ class BaseMultiRpc(ABC):
                 if (await provider.eth.wait_for_transaction_receipt(tx, timeout=timeout)).status != 1:
                     self._handle_tx_trace(func_name, func_args, func_kwargs)
                     raise TransactionFailedStatus(Web3.to_hex(tx), func_name, func_args, func_kwargs)
-                cancel_event.set()
                 return provider
             except ConnectionError:
                 if con_err_count >= 5:
@@ -320,16 +331,21 @@ class BaseMultiRpc(ABC):
 
     @staticmethod
     async def __execute_batch_tasks(
-            execution_params_list: List[Tuple],
-            task_factory: Callable[..., Coroutine[any, any, T]],
+            execution_list: List[Coroutine],
             exception_handler: Optional[List[type[BaseException]]] = None,
             final_exception: Optional[type[BaseException]] = None
     ) -> T:
+
+        async def exec_task(task: Coroutine, cancel_event: asyncio.Event):
+            res = await task
+            cancel_event.set()
+            return res
+
         mrpc_cntr.incr_cur_func()
         cancel_event = asyncio.Event()
         tasks = [
-            asyncio.create_task(task_factory(*params, cancel_event=cancel_event))
-            for params in execution_params_list
+            asyncio.create_task(exec_task(task, cancel_event=cancel_event))
+            for task in execution_list
         ]
         not_completed_tasks = tasks.copy()
         result = None
@@ -384,12 +400,11 @@ class BaseMultiRpc(ABC):
         tx_hash = Web3.to_hex(signed_transaction.hash)
         self._logger_params(tx_hash=tx_hash)
 
-        execution_tx_params_list = [
-            (p, signed_transaction.rawTransaction) for p in providers
+        execution_tx_list = [
+            self._send_transaction(p, signed_transaction.rawTransaction) for p in providers
         ]
         result = await self.__execute_batch_tasks(
-            execution_tx_params_list,
-            self._send_transaction,
+            execution_tx_list,
             [TransactionValueError],
             FailedOnAllRPCs
         )
@@ -401,12 +416,11 @@ class BaseMultiRpc(ABC):
 
         if not wait_for_receipt:
             return tx_hash
-        execution_receipt_params_list = [
-            (p, tx, wait_for_receipt, func_name, func_args, func_kwargs) for p in providers
+        execution_receipt_list = [
+            self._wait_and_get_tx_receipt(p, tx, wait_for_receipt, func_name, func_args, func_kwargs) for p in providers
         ]
         _ = await self.__execute_batch_tasks(
-            execution_receipt_params_list,
-            self._wait_and_get_tx_receipt,
+            execution_receipt_list,
             [TimeExhausted, TransactionNotFound, ConnectionError],
         )
 
@@ -454,25 +468,16 @@ class BaseMultiRpc(ABC):
     async def get_tx_receipt(self, tx_hash) -> TxReceipt:
         mrpc_cntr.incr_cur_func()
 
-        async def _get_tx_receipt(p: AsyncWeb3, transaction_hash, cancel_event: asyncio.Event) -> TxReceipt:
-            try:
-                receipt = await p.eth.wait_for_transaction_receipt(transaction_hash)
-                cancel_event.set()
-                return receipt
-            except Exception:
-                raise
-
         self.check_for_view()
 
         exceptions = (HTTPError, ConnectionError, ReadTimeout, ValueError, TimeExhausted, TransactionNotFound)
 
         last_exception = None
         for provider in self.providers['view'].values():  # type: List[AsyncWeb3]
-            execution_tx_params_list = [(p, tx_hash) for p in provider]
+            execution_tx_list = [p.eth.wait_for_transaction_receipt(tx_hash) for p in provider]
             try:
                 return await self.__execute_batch_tasks(
-                    execution_tx_params_list,
-                    _get_tx_receipt,
+                    execution_tx_list,
                     list(exceptions),
                     TransactionFailedStatus
                 )
@@ -486,26 +491,16 @@ class BaseMultiRpc(ABC):
     async def get_block(self, block_identifier: BlockIdentifier, full_transactions: bool = False) -> BlockData:
         mrpc_cntr.incr_cur_func()
 
-        async def _get_block(p: AsyncWeb3, block_number: BlockIdentifier, full_tx: bool,
-                             cancel_event: asyncio.Event) -> BlockData:
-            try:
-                receipt = await p.eth.get_block(block_number, full_tx)
-                cancel_event.set()
-                return receipt
-            except Exception:
-                raise
-
         self.check_for_view()
 
         exceptions = (HTTPError, ConnectionError, ReadTimeout, ValueError, TimeExhausted, BlockNotFound)
 
         last_exception = None
         for provider in self.providers['view'].values():  # type: List[AsyncWeb3]
-            execution_tx_params_list = [(p, block_identifier, full_transactions) for p in provider]
+            execution_tx_params_list = [p.eth.get_block(block_identifier, full_transactions) for p in provider]
             try:
                 return await self.__execute_batch_tasks(
                     execution_tx_params_list,
-                    _get_block,
                     list(exceptions),
                     GetBlockFailed
                 )

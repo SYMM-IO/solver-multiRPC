@@ -13,6 +13,11 @@ Default_RPC = 'https://fantom.publicnode.com'
 mrpc_cntr = Cntr('mrpc')
 
 
+class ViewPolicy(enum.Enum):
+    FirstSuccess = 0
+    MostUpdated = 1
+
+
 class GasEstimationMethod(enum.Enum):
     GAS_API_PROVIDER = 0
     RPC = 1

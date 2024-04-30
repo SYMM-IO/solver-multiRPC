@@ -55,3 +55,7 @@ class GetBlockFailed(Web3InterfaceException):
 
 class DontHaveThisRpcType(Web3InterfaceException):
     pass
+
+
+class NotValidViewPolicy(Web3InterfaceException):
+    pass
