@@ -4,7 +4,7 @@ import time
 from abc import ABC
 from concurrent.futures import ThreadPoolExecutor
 from time import sleep
-from typing import List, Union, Tuple, Coroutine, Dict, Optional, Callable, TypeVar
+from typing import List, Union, Tuple, Coroutine, Dict, Optional, TypeVar
 
 import web3
 from eth_account import Account
@@ -130,8 +130,6 @@ class BaseMultiRpc(ABC):
         if not is_rpc_provided:
             raise ValueError("No available rpc provided")
 
-
-
     @staticmethod
     async def __gather_tasks(execution_list: List[Coroutine], view_policy: ViewPolicy = ViewPolicy.MostUpdated) \
             -> List[any]:
@@ -147,7 +145,7 @@ class BaseMultiRpc(ABC):
 
         mrpc_cntr.incr_cur_func()
 
-        if view_policy == view_policy.MostUpdated:          # wait for all task to be completed
+        if view_policy == view_policy.MostUpdated:  # wait for all task to be completed
             with ThreadPoolExecutor() as executor:
                 base_results = executor.map(asyncio.run, execution_list)
             results = [res for res in base_results if not isinstance(res, Exception)]
@@ -157,7 +155,7 @@ class BaseMultiRpc(ABC):
                     logging.exception(exc)
                 raise FailedOnAllRPCs(f"All of RPCs raise exception. first exception: {exceptions[0]}")
             return results
-        elif view_policy == view_policy.FirstSuccess:       # wait to at least 1 task completed
+        elif view_policy == view_policy.FirstSuccess:  # wait to at least 1 task completed
             return [await BaseMultiRpc.__execute_batch_tasks(
                 execution_list,
                 [HTTPError, ConnectionError],
