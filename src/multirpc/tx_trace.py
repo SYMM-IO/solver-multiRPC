@@ -2,7 +2,7 @@ import logging
 
 import requests
 
-from constants import Default_RPC as RPC
+from .constants import Default_RPC as RPC
 
 
 class TxTrace:
