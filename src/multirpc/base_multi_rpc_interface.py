@@ -26,6 +26,7 @@ from .exceptions import (
     Web3InterfaceException, TransactionValueError, GetBlockFailed, DontHaveThisRpcType, NotValidViewPolicy,
 )
 from .gas_estimation import GasEstimation, GasEstimationMethod
+from .tx_trace import TxTrace
 from .utils import TxPriority, get_span_proper_label_from_provider, get_unix_time, NestedDict, create_web3_from_rpc, \
     calculate_chain_id, reduce_list_of_list
 
@@ -279,27 +280,24 @@ class BaseMultiRpc(ABC):
             logging.error(f"exception in send transaction: {e.__class__.__name__}, {str(e)}")
             mrpc_cntr(f'unknown ex {e.__class__.__name__}')
 
-    def _handle_tx_trace(self, func_name: str, func_args: List, func_kwargs: Dict):
+    def _handle_tx_trace(self, trace: TxTrace, func_name: str, func_args: Tuple, func_kwargs: Dict):
         """
         hedger must override this method
-        sample
-        trace = None
-        if DevEnv:
-            trace = TxTrace(Web3.to_hex(tx))
-            if "out of gas" in trace.text():
-                raise InsufficientGasBalance(f'out of gas in {func_name}')
-            if "PartyBFacet: Will be liquidatable" in trace.text():
-                raise PartyBWillBeLiquidatable(f'partyB will be liquidatable in {func_name}')
-            if "LibMuon: TSS not verified" in trace.text():
-                raise TssNotVerified(Web3.to_hex(tx), func_name, func_args, func_kwargs, trace)
-            if trace.ok():
-                logging.error(f'TraceTransaction({func_name}): {trace.result().long_error()}')
-                mrpc_cntr(f'tr-failed-{func_name}-{trace.result().long_error()}')
-                apm.capture_message(param_message={
-                    'message': f'tr failed ({func_name}, {trace.result().first_usable_error()}): %s',
-                    'params': (trace.text(),),
-                })
         """
+        # if DevEnv:
+        #     if "out of gas" in trace.text():
+        #         raise InsufficientGasBalance(f'out of gas in {func_name}')
+        #     if "PartyBFacet: Will be liquidatable" in trace.text():
+        #         raise PartyBWillBeLiquidatable(f'partyB will be liquidatable in {func_name}')
+        #     if "LibMuon: TSS not verified" in trace.text():
+        #         raise TssNotVerified(Web3.to_hex(tx), func_name, func_args, func_kwargs, trace)
+        #     if trace.ok():
+        #         logging.error(f'TraceTransaction({func_name}): {trace.result().long_error()}')
+        #         mrpc_cntr(f'tr-failed-{func_name}-{trace.result().long_error()}')
+        #         apm.capture_message(param_message={
+        #             'message': f'tr failed ({func_name}, {trace.result().first_usable_error()}): %s',
+        #             'params': (trace.text(),),
+        #         })
         pass
 
     async def _wait_and_get_tx_receipt(self, provider: AsyncWeb3, tx, timeout: float,
@@ -311,8 +309,9 @@ class BaseMultiRpc(ABC):
             try:
                 self._logger_params(received_provider=rpc_url)
                 if (await provider.eth.wait_for_transaction_receipt(tx, timeout=timeout)).status != 1:
-                    self._handle_tx_trace(func_name, func_args, func_kwargs)
-                    raise TransactionFailedStatus(Web3.to_hex(tx), func_name, func_args, func_kwargs)
+                    trace = TxTrace(Web3.to_hex(tx))
+                    self._handle_tx_trace(trace, func_name, func_args, func_kwargs)
+                    raise TransactionFailedStatus(Web3.to_hex(tx), func_name, func_args, func_kwargs, trace)
                 return provider
             except ConnectionError:
                 if con_err_count >= 5:
