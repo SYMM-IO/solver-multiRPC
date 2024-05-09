@@ -2,8 +2,10 @@ import asyncio
 import enum
 import json
 import logging
+import threading
 import time
-from functools import reduce
+from functools import reduce, wraps
+from threading import Thread
 from typing import Dict, List, Tuple, Union
 
 import aiohttp.client_exceptions
@@ -17,6 +19,34 @@ from .exceptions import MaximumRPCInEachBracketReached, AtLastProvideOneValidRPC
 
 def get_span_proper_label_from_provider(endpoint_uri):
     return endpoint_uri.split("//")[-1].replace(".", "__").replace("/", "__")
+
+
+class ReturnableThread(Thread):
+    # This class is a subclass of Thread that allows the thread to return a value.
+    def __init__(self, target, args=(), kwargs=None):
+        super().__init__(target=target, args=args, kwargs=kwargs)
+        self.target = target
+        self.args = args
+        self.kwargs = kwargs
+        self.result = None
+
+    def run(self) -> None:
+        self.result = self.target(*self.args, **self.kwargs)
+
+
+def thread_safe(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            asyncio.get_running_loop()
+            t = ReturnableThread(target=func, args=args, kwargs=kwargs)
+            t.start()
+            t.join()
+            return t.result
+        except RuntimeError:
+            return func(*args, **kwargs)
+
+    return wrapper
 
 
 def get_unix_time():

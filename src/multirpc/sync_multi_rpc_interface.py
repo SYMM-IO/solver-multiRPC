@@ -11,7 +11,7 @@ from .base_multi_rpc_interface import BaseContractFunction
 from .constants import ViewPolicy
 from .exceptions import DontHaveThisRpcType
 from .gas_estimation import GasEstimation, GasEstimationMethod
-from .utils import TxPriority, NestedDict, ContractFunctionType
+from .utils import TxPriority, NestedDict, ContractFunctionType, thread_safe
 
 logging.basicConfig(level=logging.INFO)
 
@@ -21,6 +21,7 @@ class MultiRpc(BaseMultiRpc):
     This class is used to be more sure when running web3 view calls and sending transactions by using of multiple RPCs.
     """
 
+    @thread_safe
     def __init__(
             self,
             rpc_urls: NestedDict,
@@ -51,15 +52,19 @@ class MultiRpc(BaseMultiRpc):
             )
         asyncio.run(self.setup(multicall_custom_address=multicall_custom_address))
 
+    @thread_safe
     def get_nonce(self, address: Union[Address, ChecksumAddress, str]) -> int:
         return asyncio.run(super()._get_nonce(address))
 
+    @thread_safe
     def get_tx_receipt(self, tx_hash) -> TxReceipt:
         return asyncio.run(super().get_tx_receipt(tx_hash))
 
+    @thread_safe
     def get_block(self, block_identifier: BlockIdentifier, full_transactions: bool = False) -> BlockData:
         return asyncio.run(super().get_block(block_identifier, full_transactions))
 
+    @thread_safe
     def get_block_number(self) -> List[int]:
         return asyncio.run((super().get_block_number()))
 
@@ -70,6 +75,7 @@ class MultiRpc(BaseMultiRpc):
             cf.kwargs = kwargs
             return cf
 
+        @thread_safe
         def call(
                 self,
                 address: str = None,
