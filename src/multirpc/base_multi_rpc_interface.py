@@ -396,7 +396,7 @@ class BaseMultiRpc(ABC):
         self._logger_params(tx_hash=tx_hash)
 
         execution_tx_list = [
-            self._send_transaction(p, signed_transaction.rawTransaction) for p in providers
+            self._send_transaction(p, signed_transaction.raw_transaction) for p in providers
         ]
         result = await self.__execute_batch_tasks(
             execution_tx_list,
