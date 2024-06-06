@@ -75,8 +75,8 @@ class GasEstimation:
         try:
             resp = requests.get(gas_provider, timeout=RequestTimeout)
             resp_json = resp.json()
-            max_fee_per_gas = Decimal(resp_json[priority]["suggestedMaxFeePerGas"])
-            max_priority_fee_per_gas = Decimal(resp_json[priority]["suggestedMaxPriorityFeePerGas"])
+            max_fee_per_gas = Decimal(resp_json[priority.value]["suggestedMaxFeePerGas"])
+            max_priority_fee_per_gas = Decimal(resp_json[priority.value]["suggestedMaxPriorityFeePerGas"])
             self.__logger_params(
                 max_fee_per_gas=max_fee_per_gas,
                 max_priority_fee_per_gas=max_priority_fee_per_gas,
