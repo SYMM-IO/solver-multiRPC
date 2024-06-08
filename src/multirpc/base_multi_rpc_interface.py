@@ -30,8 +30,6 @@ from .tx_trace import TxTrace
 from .utils import TxPriority, get_span_proper_label_from_provider, get_unix_time, NestedDict, create_web3_from_rpc, \
     calculate_chain_id, reduce_list_of_list
 
-logging.basicConfig(level=logging.INFO)
-
 T = TypeVar("T")
 
 
@@ -52,6 +50,7 @@ class BaseMultiRpc(ABC):
             apm=None,
             enable_gas_estimation: bool = False,
             is_proof_authority: bool = False,
+            log_level: logging = logging.WARN
     ):
         self.rpc_urls = rpc_urls
 
@@ -75,6 +74,8 @@ class BaseMultiRpc(ABC):
         self.private_key = None
         self.chain_id = None
         self.is_proof_authority = is_proof_authority
+
+        logging.basicConfig(level=log_level)
 
     def _logger_params(self, **kwargs) -> None:
         if self.apm:

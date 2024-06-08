@@ -13,8 +13,6 @@ from .exceptions import DontHaveThisRpcType
 from .gas_estimation import GasEstimation, GasEstimationMethod
 from .utils import TxPriority, NestedDict, ContractFunctionType, thread_safe
 
-logging.basicConfig(level=logging.INFO)
-
 
 class MultiRpc(BaseMultiRpc):
     """
@@ -34,10 +32,11 @@ class MultiRpc(BaseMultiRpc):
             apm=None,
             enable_gas_estimation: bool = False,
             is_proof_authority: bool = False,
-            multicall_custom_address: str = None
+            multicall_custom_address: str = None,
+            log_level: logging = logging.WARN
     ):
         super().__init__(rpc_urls, contract_address, contract_abi, view_policy, gas_estimation, gas_limit,
-                         gas_upper_bound, apm, enable_gas_estimation, is_proof_authority)
+                         gas_upper_bound, apm, enable_gas_estimation, is_proof_authority, log_level)
 
         for func_abi in self.contract_abi:
             if func_abi.get("stateMutability") in ("view", "pure"):

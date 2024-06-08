@@ -9,7 +9,7 @@ from src.multirpc.async_multi_rpc_interface import AsyncMultiRpc
 from src.multirpc.constants import ViewPolicy
 from src.multirpc.sync_multi_rpc_interface import MultiRpc
 from src.tests.constants import ContractAddr, RPCs
-from src.tests.test_settings import PrivateKey1, PrivateKey2
+from src.tests.test_settings import PrivateKey1, PrivateKey2, LogLevel
 
 
 async def async_test_map(mr: AsyncMultiRpc, addr: str = None, pk: str = None):
@@ -25,7 +25,7 @@ async def async_test_map(mr: AsyncMultiRpc, addr: str = None, pk: str = None):
 
 async def async_main():
     multi_rpc = AsyncMultiRpc(rpcs, contract_addr, view_policy=ViewPolicy.FirstSuccess, contract_abi=abi,
-                              gas_estimation=None, enable_gas_estimation=True)
+                              gas_estimation=None, enable_gas_estimation=True, log_level=log_level)
     await multi_rpc.setup()
     multi_rpc.set_account(address1, private_key=private_key1)
 
@@ -52,7 +52,8 @@ def sync_test_map(mr: MultiRpc, addr: str = None, pk: str = None):
 
 
 def sync_main():
-    multi_rpc = MultiRpc(rpcs, contract_addr, contract_abi=abi, gas_estimation=None, enable_gas_estimation=True)
+    multi_rpc = MultiRpc(rpcs, contract_addr, contract_abi=abi, gas_estimation=None, enable_gas_estimation=True,
+                         log_level=log_level)
     multi_rpc.set_account(address1, private_key=private_key1)
 
     print(f"tx_receipt: {multi_rpc.get_tx_receipt(tx_hash)}")
@@ -73,6 +74,7 @@ async def test():
 
 
 if __name__ == '__main__':
+    log_level = LogLevel
     private_key1 = PrivateKey1
     private_key2 = PrivateKey2
     address1 = Account.from_key(private_key1).address
