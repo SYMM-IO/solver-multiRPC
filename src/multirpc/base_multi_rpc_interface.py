@@ -145,14 +145,30 @@ class BaseMultiRpc(ABC):
 
         """
 
+        def wrap_coroutine(coro):
+            def sync_wrapper():
+                try:
+                    res = asyncio.run(coro)
+                    return res, None
+                except Exception as e:
+                    return None, e
+
+            return sync_wrapper
+
         mrpc_cntr.incr_cur_func()
 
         if view_policy == view_policy.MostUpdated:  # wait for all task to be completed
+            results = []
+            exceptions = []
             with ThreadPoolExecutor() as executor:
-                base_results = executor.map(asyncio.run, execution_list)
-            results = [res for res in base_results if not isinstance(res, Exception)]
+                wrapped_coroutines = [wrap_coroutine(coro) for coro in execution_list]
+                for result, exception in executor.map(lambda f: f(), wrapped_coroutines):
+                    if exception:
+                        exceptions.append(exception)
+                    else:
+                        results.append(result)
+
             if len(results) == 0:
-                exceptions = [res for res in base_results if isinstance(res, Exception)]
                 for exc in exceptions:
                     logging.exception(exc)
                 raise FailedOnAllRPCs(f"All of RPCs raise exception. first exception: {exceptions[0]}")
@@ -160,7 +176,7 @@ class BaseMultiRpc(ABC):
         elif view_policy == view_policy.FirstSuccess:  # wait to at least 1 task completed
             return [await BaseMultiRpc.__execute_batch_tasks(
                 execution_list,
-                [HTTPError, ConnectionError],
+                [HTTPError, ConnectionError, ValueError],
                 FailedOnAllRPCs
             )]
 
@@ -487,11 +503,9 @@ class BaseMultiRpc(ABC):
 
     async def get_block(self, block_identifier: BlockIdentifier, full_transactions: bool = False) -> BlockData:
         mrpc_cntr.incr_cur_func()
-
         self.check_for_view()
 
         exceptions = (HTTPError, ConnectionError, ReadTimeout, ValueError, TimeExhausted, BlockNotFound)
-
         last_exception = None
         for provider in self.providers['view'].values():  # type: List[AsyncWeb3]
             execution_tx_params_list = [p.eth.get_block(block_identifier, full_transactions) for p in provider]
@@ -508,11 +522,27 @@ class BaseMultiRpc(ABC):
                 raise
         raise last_exception
 
-    async def get_block_number(self) -> List[int]:
+    async def get_block_number(self) -> int:
         mrpc_cntr.incr_cur_func()
         self.check_for_view()
-        execution_list = [asyncio.to_thread(provider.eth.get_block_number) for provider in self.providers['view']]
-        return await self.__gather_tasks(execution_list)
+
+        exceptions = (HTTPError, ConnectionError, ReadTimeout, ValueError, TimeExhausted)
+        last_exception = None
+        for provider in self.providers['view'].values():  # type: List[AsyncWeb3]
+            execution_tx_params_list = [asyncio.to_thread(p.eth.get_block_number) for p in provider]
+            try:
+                result = await self.__execute_batch_tasks(
+                    execution_tx_params_list,
+                    list(exceptions),
+                    GetBlockFailed
+                )
+                return await result
+            except exceptions as e:
+                last_exception = e
+                pass
+            except GetBlockFailed:
+                raise
+        raise last_exception
 
 
 class BaseContractFunction:

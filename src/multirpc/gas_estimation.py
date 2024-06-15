@@ -5,6 +5,7 @@ from typing import Callable, Union
 from typing import List, Dict, Optional
 
 import requests
+from aiohttp import ClientResponseError
 from requests import JSONDecodeError, RequestException, ReadTimeout, ConnectionError
 from web3 import Web3, AsyncWeb3
 from web3.types import Wei
@@ -108,8 +109,12 @@ class GasEstimation:
                 if gas_price / 1e9 <= gas_upper_bound:
                     found_gas_below_upper_bound = True
                     break
-            except (ConnectionError, ReadTimeout, ValueError) as e:
+            except (ConnectionError, ReadTimeout, ValueError, ConnectionResetError) as e:
                 logging.error(f"Failed to get gas price from {rpc_url}, {e=}")
+            except ClientResponseError as e:
+                if e.message.startswith("Too Many Requests"):
+                    logging.error(f"Failed to get gas price from {rpc_url}, {e=}")
+                raise
 
         if gas_price is None:
             raise FailedToGetGasPrice("Non of RCP could provide gas price!")

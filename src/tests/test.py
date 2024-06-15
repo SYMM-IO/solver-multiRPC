@@ -27,10 +27,13 @@ async def async_main():
                               gas_estimation=None, enable_gas_estimation=True, log_level=LogLevel)
     multi_rpc.set_account(address1, private_key=PrivateKey1)
 
+    p_block = await multi_rpc.get_block_number() - 80
     print(f"tx_receipt: {await multi_rpc.get_tx_receipt(tx_hash)}")
     print(f"block: {await multi_rpc.get_block(block)}")
     print(f"Nonce: {await multi_rpc.get_nonce(address1)}")
     print(f"map(addr): 0x{bytes(await multi_rpc.functions.map(address1).call()).hex()}")
+    print(f"map(addr) in {p_block=}: "
+          f"0x{bytes(await multi_rpc.functions.map(address1).call(block_identifier=p_block)).hex()}")
 
     await async_test_map(multi_rpc, address1)
     await async_test_map(multi_rpc, address2, PrivateKey2)
@@ -54,10 +57,13 @@ def sync_main():
                          log_level=LogLevel)
     multi_rpc.set_account(address1, private_key=PrivateKey1)
 
+    p_block = multi_rpc.get_block_number() - 80
     print(f"tx_receipt: {multi_rpc.get_tx_receipt(tx_hash)}")
     print(f"block: {multi_rpc.get_block(block)}")
     print(f"Nonce: {multi_rpc.get_nonce(address1)}")
     print(f"map(addr): 0x{bytes(multi_rpc.functions.map(address1).call()).hex()}")
+    print(f"map(addr) in {p_block=}: "
+          f"0x{bytes(multi_rpc.functions.map(address1).call(block_identifier=p_block)).hex()}")
 
     sync_test_map(multi_rpc, address1)
     sync_test_map(multi_rpc, address2, PrivateKey2)
@@ -66,7 +72,6 @@ def sync_main():
 
 
 async def test():
-
     sync_main()
     await async_main()
 
@@ -76,6 +81,6 @@ if __name__ == '__main__':
     address2 = Account.from_key(PrivateKey2).address
     contract_addr = Web3.to_checksum_address(ContractAddr)
     tx_hash = '0x7bb81aba6b2ea3145034c676e89d4eb0bc2cdc423a95b8b32d50100fe18d90e5'
-    block = 69354608
+    block = 69_354_608
 
     asyncio.run(test())
