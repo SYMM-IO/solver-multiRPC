@@ -20,7 +20,7 @@ class GasEstimation:
     def __init__(
             self,
             chain_id: int,
-            providers: List,
+            providers: List[AsyncWeb3],
             default_method: Optional[GasEstimationMethod] = None,
             apm_client=None,
             gas_multiplier_low: Union[float, Decimal] = 1,

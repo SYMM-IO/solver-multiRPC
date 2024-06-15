@@ -1,4 +1,5 @@
 from src.multirpc.utils import NestedDict
+import json
 
 ContractAddr = "0x20f40F64771c3a5aa0A5166d1261984E08Ca027B"
 RPCs = NestedDict({
@@ -13,3 +14,6 @@ RPCs = NestedDict({
         3: ['https://rpc.ankr.com/fantom'],
     }
 })
+
+with open("tests/abi.json", "r") as f:
+    abi = json.load(f)

@@ -104,7 +104,7 @@ class BaseMultiRpc(ABC):
             self.gas_estimation = GasEstimation(
                 self.chain_id,
                 reduce_list_of_list(self.providers['transaction'].values()),
-                # GasEstimationMethod.METAMASK,
+                # GasEstimationMethod.RPC,
             )
 
         is_rpc_provided = False
@@ -357,6 +357,7 @@ class BaseMultiRpc(ABC):
             if e:
                 if exception_handler and e in exception_handler:
                     exception = e
+                    continue
                 else:
                     exception = e
                     break
