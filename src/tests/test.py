@@ -5,7 +5,7 @@ from eth_account import Account
 from web3 import Web3
 
 from src.multirpc.async_multi_rpc_interface import AsyncMultiRpc
-from src.multirpc.constants import ViewPolicy
+from src.multirpc.constants import ViewPolicy, GasEstimationMethod
 from src.multirpc.sync_multi_rpc_interface import MultiRpc
 from src.tests.constants import ContractAddr, RPCs, abi
 from src.tests.test_settings import PrivateKey1, PrivateKey2, LogLevel
@@ -14,7 +14,12 @@ from src.tests.test_settings import PrivateKey1, PrivateKey2, LogLevel
 async def async_test_map(mr: AsyncMultiRpc, addr: str = None, pk: str = None):
     random_hex = hex(random.randint(0x10, 0xff))
     print(f"Random hex: {random_hex}")
-    await mr.functions.set(random_hex).call(address=addr, private_key=pk)
+    await mr.functions.set(random_hex).call(address=addr, private_key=pk,
+                                            gas_estimation_method=GasEstimationMethod.GAS_API_PROVIDER)
+    await mr.functions.set(random_hex).call(address=addr, private_key=pk,
+                                            gas_estimation_method=GasEstimationMethod.RPC)
+    await mr.functions.set(random_hex).call(address=addr, private_key=pk,
+                                            gas_estimation_method=GasEstimationMethod.FIXED)
 
     result: bytes = await mr.functions.map(addr).call()
     result_hex = "0x" + result.hex()
@@ -27,7 +32,7 @@ async def async_main():
                               gas_estimation=None, enable_gas_estimation=True, log_level=LogLevel)
     multi_rpc.set_account(address1, private_key=PrivateKey1)
 
-    p_block = await multi_rpc.get_block_number() - 80
+    p_block = await multi_rpc.get_block_number() - 50
     print(f"tx_receipt: {await multi_rpc.get_tx_receipt(tx_hash)}")
     print(f"block: {await multi_rpc.get_block(block)}")
     print(f"Nonce: {await multi_rpc.get_nonce(address1)}")
@@ -57,7 +62,7 @@ def sync_main():
                          log_level=LogLevel)
     multi_rpc.set_account(address1, private_key=PrivateKey1)
 
-    p_block = multi_rpc.get_block_number() - 80
+    p_block = multi_rpc.get_block_number() - 50
     print(f"tx_receipt: {multi_rpc.get_tx_receipt(tx_hash)}")
     print(f"block: {multi_rpc.get_block(block)}")
     print(f"Nonce: {multi_rpc.get_nonce(address1)}")

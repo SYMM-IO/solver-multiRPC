@@ -92,10 +92,10 @@ class GasEstimation:
                 "maxPriorityFeePerGas": Web3.to_wei(max_priority_fee_per_gas, "GWei"),
             }
             return gas_params
-        except (RequestException, JSONDecodeError, KeyError):
+        except (RequestException, JSONDecodeError, KeyError) as e:
             if not DevEnv:
                 logging.exception(f'Failed to get gas info from metaswap {resp.status_code=}')
-            raise FailedToGetGasPrice("Failed to get gas info from api")
+            raise FailedToGetGasPrice(f"Failed to get gas info from api: {e}")
 
     async def _get_gas_from_rpc(self, priority: TxPriority, gas_upper_bound: Union[float, Decimal]) -> Dict[str, Wei]:
         gas_price = None

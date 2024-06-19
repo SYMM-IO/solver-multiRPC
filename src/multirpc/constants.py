@@ -3,10 +3,11 @@ import enum
 from logmon.cntr import Cntr
 
 ChainIdToGas = {
-    97: 10.1,  # Test BNB Network
+    97: 10.1,   # Test BNB Network
+    250: 60,    # ftm
 }
 GasFromRpcChainIds = [56, 8453]     # for this chain ids use rpc to estimate gas
-FixedValueGas = 10
+FixedValueGas = 30
 DEFAULT_API_PROVIDER = 'https://gas-api.metaswap.codefi.network/networks/{chain_id}/suggestedGasFees'
 Default_RPC = 'https://fantom.publicnode.com'
 

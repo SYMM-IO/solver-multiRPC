@@ -28,7 +28,7 @@ from .exceptions import (
 from .gas_estimation import GasEstimation, GasEstimationMethod
 from .tx_trace import TxTrace
 from .utils import TxPriority, get_span_proper_label_from_provider, get_unix_time, NestedDict, create_web3_from_rpc, \
-    calculate_chain_id, reduce_list_of_list
+    calculate_chain_id, reduce_list_of_list, ResultEvent
 
 T = TypeVar("T")
 
@@ -145,7 +145,7 @@ class BaseMultiRpc(ABC):
 
         """
 
-        def wrap_coroutine(coro):
+        def wrap_coroutine(coro: Coroutine):
             def sync_wrapper():
                 try:
                     res = asyncio.run(coro)
@@ -241,7 +241,7 @@ class BaseMultiRpc(ABC):
 
     @staticmethod
     async def _build_transaction(contract: Contract, func_name: str, func_args: Tuple,
-                                 func_kwargs: Dict, tx_params: Dict) -> Coroutine:
+                                 func_kwargs: Dict, tx_params: Dict):
         func_args = func_args or []
         func_kwargs = func_kwargs or {}
         return await contract.functions.__getattribute__(func_name)(*func_args, **func_kwargs
@@ -348,38 +348,42 @@ class BaseMultiRpc(ABC):
             final_exception: Optional[type[BaseException]] = None
     ) -> T:
 
-        async def exec_task(task: Coroutine, cancel_event: asyncio.Event):
+        async def exec_task(task: Coroutine, cancel_event: ResultEvent, lock: asyncio.Lock):
             res = await task
+            async with lock:
+                cancel_event.set_result(res)
             cancel_event.set()
-            return res
 
         mrpc_cntr.incr_cur_func()
-        cancel_event = asyncio.Event()
+
+        cancel_event = ResultEvent()
+        lock = asyncio.Lock()
+
         tasks = [
-            asyncio.create_task(exec_task(task, cancel_event=cancel_event))
+            asyncio.create_task(exec_task(task, cancel_event, lock))
             for task in execution_list
         ]
         not_completed_tasks = tasks.copy()
-        result = None
         exception = None
+        terminal_exception = None
 
         while len(not_completed_tasks) > 0:
-            task, not_completed_tasks = await asyncio.wait(
+            dones, not_completed_tasks = await asyncio.wait(
                 not_completed_tasks, return_when=asyncio.FIRST_COMPLETED
             )
-            task = list(task)[0]
-            e = task.exception()
 
-            if e:
-                if exception_handler and e in exception_handler:
-                    exception = e
+            for task in list(dones):
+                e = task.exception()
+                if e:
+                    if exception_handler and isinstance(e, tuple(exception_handler)):
+                        exception = e
+                    else:
+                        terminal_exception = e
                     continue
-                else:
-                    exception = e
+                if cancel_event.is_set():
                     break
 
-            if cancel_event.is_set():
-                result = task.result()
+            if cancel_event.is_set() or terminal_exception:
                 break
 
         # Cancel the remaining tasks
@@ -389,10 +393,10 @@ class BaseMultiRpc(ABC):
         await asyncio.gather(*tasks, return_exceptions=True)
 
         if cancel_event.is_set():
-            return result
-        if exception:
-            raise exception
-        raise final_exception
+            return cancel_event.get_result()
+        if terminal_exception or exception:
+            raise terminal_exception or exception
+        raise final_exception or RuntimeError("Execution completed without setting a result or exception.")
 
     async def __call_tx(
             self,
@@ -418,7 +422,7 @@ class BaseMultiRpc(ABC):
         ]
         result = await self.__execute_batch_tasks(
             execution_tx_list,
-            [TransactionValueError],
+            [TransactionValueError, ValueError],
             FailedOnAllRPCs
         )
         provider, tx = result
@@ -472,6 +476,8 @@ class BaseMultiRpc(ABC):
                 raise
             except (ConnectionError, ReadTimeout, TimeExhausted, TransactionNotFound, FailedOnAllRPCs):
                 pass
+            except Exception:
+                raise
         raise Web3InterfaceException("All of RPCs raise exception.")
 
     def check_for_view(self):

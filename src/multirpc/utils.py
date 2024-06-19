@@ -34,6 +34,18 @@ class ReturnableThread(Thread):
         self.result = self.target(*self.args, **self.kwargs)
 
 
+class ResultEvent(asyncio.Event):
+    def __init__(self):
+        super().__init__()
+        self.result_ = None
+
+    def set_result(self, result):
+        self.result_ = result
+
+    def get_result(self):
+        return self.result_
+
+
 def thread_safe(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
