@@ -288,10 +288,11 @@ class BaseMultiRpc(ABC):
                     'exceeds the configured cap' in str(e).lower()
             ):
                 logging.exception("_send_transaction_exception")
-                raise
+            raise
         except (ConnectionError, ReadTimeout, HTTPError) as e:  # FIXME complete list
             logging.debug(f"network exception in send transaction: {e.__class__.__name__}, {str(e)}")
             mrpc_cntr(f'net ex {e.__class__.__name__}')
+            raise
         except Exception as e:
             # FIXME needs better exception handling
             logging.error(f"exception in send transaction: {e.__class__.__name__}, {str(e)}")
@@ -422,7 +423,7 @@ class BaseMultiRpc(ABC):
         ]
         result = await self.__execute_batch_tasks(
             execution_tx_list,
-            [TransactionValueError, ValueError],
+            [TransactionValueError, ValueError, ConnectionError, ReadTimeout, HTTPError],
             FailedOnAllRPCs
         )
         provider, tx = result
