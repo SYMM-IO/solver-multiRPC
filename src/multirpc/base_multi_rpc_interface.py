@@ -318,19 +318,19 @@ class BaseMultiRpc(ABC):
         #         })
         pass
 
-    async def _wait_and_get_tx_receipt(self, provider: AsyncWeb3, tx, timeout: float,
-                                       func_name: str, func_args: Tuple, func_kwargs: Dict) -> AsyncWeb3:
+    async def _wait_and_get_tx_receipt(self, provider: AsyncWeb3, tx, timeout: float, func_name: str,
+                                       func_args: Tuple, func_kwargs: Dict) -> Tuple[AsyncWeb3, TxReceipt]:
         mrpc_cntr.incr_cur_func()
         con_err_count = tx_err_count = 0
         rpc_url = provider.provider.endpoint_uri
         while True:
             try:
                 self._logger_params(received_provider=rpc_url)
-                if (await provider.eth.wait_for_transaction_receipt(tx, timeout=timeout)).status != 1:
+                if (tx_receipt := await provider.eth.wait_for_transaction_receipt(tx, timeout=timeout)).status != 1:
                     trace = TxTrace(Web3.to_hex(tx))
                     self._handle_tx_trace(trace, func_name, func_args, func_kwargs)
                     raise TransactionFailedStatus(Web3.to_hex(tx), func_name, func_args, func_kwargs, trace)
-                return provider
+                return provider, tx_receipt
             except ConnectionError:
                 if con_err_count >= 5:
                     raise
@@ -344,7 +344,7 @@ class BaseMultiRpc(ABC):
 
     @staticmethod
     async def __execute_batch_tasks(
-            execution_list: List[Coroutine],
+            execution_list: List[Coroutine[None, None, T]],
             exception_handler: Optional[List[type[BaseException]]] = None,
             final_exception: Optional[type[BaseException]] = None
     ) -> T:
@@ -410,7 +410,7 @@ class BaseMultiRpc(ABC):
             contracts: List[Contract],
             tx_params: Dict,
             enable_gas_estimation: bool,
-    ) -> str:
+    ) -> Union[str, TxReceipt]:
         mrpc_cntr.incr_cur_func()
         signed_transaction = await self._build_and_sign_transaction(
             contracts[0], providers[0], func_name, func_args, func_kwargs, private_key, tx_params, enable_gas_estimation
@@ -437,12 +437,12 @@ class BaseMultiRpc(ABC):
         execution_receipt_list = [
             self._wait_and_get_tx_receipt(p, tx, wait_for_receipt, func_name, func_args, func_kwargs) for p in providers
         ]
-        _ = await self.__execute_batch_tasks(
+        provider, tx_receipt = await self.__execute_batch_tasks(
             execution_receipt_list,
             [TimeExhausted, TransactionNotFound, ConnectionError],
         )
 
-        return tx_hash
+        return tx_receipt
 
     async def _call_view_function(self,
                                   func_name: str,

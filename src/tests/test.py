@@ -17,10 +17,10 @@ async def async_test_map(mr: AsyncMultiRpc, addr: str = None, pk: str = None):
     await mr.functions.set(random_hex).call(address=addr, private_key=pk,
                                             gas_estimation_method=GasEstimationMethod.GAS_API_PROVIDER)
     await mr.functions.set(random_hex).call(address=addr, private_key=pk,
-                                            gas_estimation_method=GasEstimationMethod.RPC)
-    await mr.functions.set(random_hex).call(address=addr, private_key=pk,
                                             gas_estimation_method=GasEstimationMethod.FIXED)
-
+    tx_receipt = await mr.functions.set(random_hex).call(address=addr, private_key=pk,
+                                                         gas_estimation_method=GasEstimationMethod.RPC)
+    print(f"{tx_receipt=}")
     result: bytes = await mr.functions.map(addr).call()
     result_hex = "0x" + result.hex()
     print(f"map(addr: {addr}): {result_hex}")
@@ -77,7 +77,7 @@ def sync_main():
 
 
 async def test():
-    sync_main()
+    # sync_main()
     await async_main()
 
 
