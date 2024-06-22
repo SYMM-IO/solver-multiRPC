@@ -4,7 +4,7 @@ import time
 from abc import ABC
 from concurrent.futures import ThreadPoolExecutor
 from time import sleep
-from typing import List, Union, Tuple, Coroutine, Dict, Optional, TypeVar
+from typing import List, Union, Tuple, Coroutine, Dict, Optional, TypeVar, Callable
 
 import web3
 from eth_account import Account
@@ -133,8 +133,8 @@ class BaseMultiRpc(ABC):
             raise ValueError("No available rpc provided")
 
     @staticmethod
-    async def __gather_tasks(execution_list: List[Coroutine], view_policy: ViewPolicy = ViewPolicy.MostUpdated) \
-            -> List[any]:
+    async def __gather_tasks(execution_list: List[Coroutine], result_selector: Callable[[List], any],
+                             view_policy: ViewPolicy = ViewPolicy.MostUpdated):
         """
         Get an execution list and wait for all to end. If all executable raise an exception, it will raise a
         'Web3InterfaceException' exception, otherwise returns all results which has no exception
@@ -172,20 +172,21 @@ class BaseMultiRpc(ABC):
                 for exc in exceptions:
                     logging.exception(exc)
                 raise FailedOnAllRPCs(f"All of RPCs raise exception. first exception: {exceptions[0]}")
-            return results
+            return result_selector(results)
         elif view_policy == view_policy.FirstSuccess:  # wait to at least 1 task completed
-            return [await BaseMultiRpc.__execute_batch_tasks(
+            return await BaseMultiRpc.__execute_batch_tasks(
                 execution_list,
                 [HTTPError, ConnectionError, ValueError],
                 FailedOnAllRPCs
-            )]
+            )
 
         raise NotValidViewPolicy()
 
     async def __call_view_function(self,
                                    func_name: str,
+                                   result_selector: Callable[[List], any],
                                    block_identifier: Union[str, int] = 'latest',
-                                   *args, **kwargs) -> List[any]:
+                                   *args, **kwargs):
         """
         Calling view function 'func_name' by using of multicall
 
@@ -206,7 +207,7 @@ class BaseMultiRpc(ABC):
             execution_list = [mc.call([call], block_identifier=block_identifier) for mc, call in
                               zip(multi_calls, calls)]
             try:
-                return await self.__gather_tasks(execution_list, view_policy=self.view_policy)
+                return await self.__gather_tasks(execution_list, result_selector, view_policy=self.view_policy)
             except (Web3InterfaceException, asyncio.TimeoutError):
                 logging.info(f"Can't call view function from this list of rpc({rpc_bracket})")
         raise Web3InterfaceException("All of RPCs raise exception.")
@@ -220,7 +221,7 @@ class BaseMultiRpc(ABC):
                 prov.eth.get_transaction_count(address) for prov in providers
             ]
             try:
-                return max(await self.__gather_tasks(execution_list))
+                return await self.__gather_tasks(execution_list, max)
             except (Web3InterfaceException, asyncio.TimeoutError) as e:
                 logging.warning(f"get_nounce: {e}")
                 pass
@@ -450,15 +451,18 @@ class BaseMultiRpc(ABC):
                                   func_name: str,
                                   block_identifier: Union[str, int] = 'latest',
                                   *args, **kwargs) -> bytes:
+
+        def max_block_finder(results: List):
+            max_block_number = results[0][0]
+            max_index = 0
+            for i, result in enumerate(results):
+                if result[0] > max_block_number:
+                    max_block_number = result[0]
+                    max_index = i
+            return results[max_index][2][0]
+
         mrpc_cntr.incr_cur_func()
-        results = await self.__call_view_function(func_name, block_identifier, *args, **kwargs)
-        max_block_number = results[0][0]
-        max_index = 0
-        for i, result in enumerate(results):
-            if result[0] > max_block_number:
-                max_block_number = result[0]
-                max_index = i
-        return results[max_index][2][0]
+        return await self.__call_view_function(func_name, max_block_finder, block_identifier, *args, **kwargs)
 
     async def _call_tx_function(self, address: str, gas_limit: int, gas_upper_bound: int, priority: TxPriority,
                                 gas_estimation_method: GasEstimationMethod,
