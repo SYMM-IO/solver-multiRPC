@@ -2,7 +2,6 @@ import asyncio
 import enum
 import json
 import logging
-import threading
 import time
 from functools import reduce, wraps
 from threading import Thread

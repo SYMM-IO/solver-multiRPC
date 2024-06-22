@@ -300,22 +300,24 @@ class BaseMultiRpc(ABC):
 
     def _handle_tx_trace(self, trace: TxTrace, func_name: str, func_args: Tuple, func_kwargs: Dict):
         """
-        hedger must override this method
+        You can override this method to customize handling failed transaction.
+
+        example:
+            if "out of gas" in trace.text():
+                raise InsufficientGasBalance(f'out of gas in {func_name}')
+            if "PartyBFacet: Will be liquidatable" in trace.text():
+                raise PartyBWillBeLiquidatable(f'partyB will be liquidatable in {func_name}')
+            if "LibMuon: TSS not verified" in trace.text():
+                raise TssNotVerified(Web3.to_hex(tx), func_name, func_args, func_kwargs, trace)
+            if trace.ok():
+                logging.error(f'TraceTransaction({func_name}): {trace.result().long_error()}')
+                mrpc_cntr(f'tr-failed-{func_name}-{trace.result().long_error()}')
+                apm.capture_message(param_message={
+                    'message': f'tr failed ({func_name}, {trace.result().first_usable_error()}): %s',
+                    'params': (trace.text(),),
+                })
         """
-        # if DevEnv:
-        #     if "out of gas" in trace.text():
-        #         raise InsufficientGasBalance(f'out of gas in {func_name}')
-        #     if "PartyBFacet: Will be liquidatable" in trace.text():
-        #         raise PartyBWillBeLiquidatable(f'partyB will be liquidatable in {func_name}')
-        #     if "LibMuon: TSS not verified" in trace.text():
-        #         raise TssNotVerified(Web3.to_hex(tx), func_name, func_args, func_kwargs, trace)
-        #     if trace.ok():
-        #         logging.error(f'TraceTransaction({func_name}): {trace.result().long_error()}')
-        #         mrpc_cntr(f'tr-failed-{func_name}-{trace.result().long_error()}')
-        #         apm.capture_message(param_message={
-        #             'message': f'tr failed ({func_name}, {trace.result().first_usable_error()}): %s',
-        #             'params': (trace.text(),),
-        #         })
+
         pass
 
     async def _wait_and_get_tx_receipt(self, provider: AsyncWeb3, tx, timeout: float, func_name: str,
