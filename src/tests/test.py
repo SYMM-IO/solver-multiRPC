@@ -77,7 +77,7 @@ def sync_main():
 
 
 async def test():
-    # sync_main()
+    sync_main()
     await async_main()
 
 

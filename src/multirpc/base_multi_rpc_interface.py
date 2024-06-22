@@ -174,11 +174,11 @@ class BaseMultiRpc(ABC):
                 raise FailedOnAllRPCs(f"All of RPCs raise exception. first exception: {exceptions[0]}")
             return result_selector(results)
         elif view_policy == view_policy.FirstSuccess:  # wait to at least 1 task completed
-            return await BaseMultiRpc.__execute_batch_tasks(
+            return result_selector([await BaseMultiRpc.__execute_batch_tasks(
                 execution_list,
                 [HTTPError, ConnectionError, ValueError],
                 FailedOnAllRPCs
-            )
+            )])
 
         raise NotValidViewPolicy()
 
