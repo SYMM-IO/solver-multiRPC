@@ -298,6 +298,7 @@ class BaseMultiRpc(ABC):
             # FIXME needs better exception handling
             logging.error(f"exception in send transaction: {e.__class__.__name__}, {str(e)}")
             mrpc_cntr(f'unknown ex {e.__class__.__name__}')
+            raise
 
     def _handle_tx_trace(self, trace: TxTrace, func_name: str, func_args: Tuple, func_kwargs: Dict):
         """
