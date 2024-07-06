@@ -182,11 +182,10 @@ class BaseMultiRpc(ABC):
 
         raise NotValidViewPolicy()
 
-    async def __call_view_function(self,
-                                   func_name: str,
-                                   result_selector: Callable[[List], any],
-                                   block_identifier: Union[str, int] = 'latest',
-                                   *args, **kwargs):
+    async def _call_view_function(self,
+                                  func_name: str,
+                                  block_identifier: Union[str, int] = 'latest',
+                                  *args, **kwargs):
         """
         Calling view function 'func_name' by using of multicall
 
@@ -198,6 +197,16 @@ class BaseMultiRpc(ABC):
         Returns:
             the results of multicallable object for each rpc
         """
+
+        def max_block_finder(results: List):
+            max_block_number = results[0][0]
+            max_index = 0
+            for i, result in enumerate(results):
+                if result[0] > max_block_number:
+                    max_block_number = result[0]
+                    max_index = i
+            return results[max_index][2][0]
+
         mrpc_cntr.incr_cur_func()
         for contracts, multi_calls in zip(self.contracts['view'].values(),
                                           self.multi_calls['view'].values()):  # type: any, List[AsyncMulticall]
@@ -207,7 +216,7 @@ class BaseMultiRpc(ABC):
             execution_list = [mc.call([call], block_identifier=block_identifier) for mc, call in
                               zip(multi_calls, calls)]
             try:
-                return await self.__gather_tasks(execution_list, result_selector, view_policy=self.view_policy)
+                return await self.__gather_tasks(execution_list, max_block_finder, view_policy=self.view_policy)
             except (Web3InterfaceException, asyncio.TimeoutError):
                 logging.info(f"Can't call view function from this list of rpc({rpc_bracket})")
         raise Web3InterfaceException("All of RPCs raise exception.")
@@ -447,23 +456,6 @@ class BaseMultiRpc(ABC):
         )
 
         return tx_receipt
-
-    async def _call_view_function(self,
-                                  func_name: str,
-                                  block_identifier: Union[str, int] = 'latest',
-                                  *args, **kwargs) -> bytes:
-
-        def max_block_finder(results: List):
-            max_block_number = results[0][0]
-            max_index = 0
-            for i, result in enumerate(results):
-                if result[0] > max_block_number:
-                    max_block_number = result[0]
-                    max_index = i
-            return results[max_index][2][0]
-
-        mrpc_cntr.incr_cur_func()
-        return await self.__call_view_function(func_name, max_block_finder, block_identifier, *args, **kwargs)
 
     async def _call_tx_function(self, address: str, gas_limit: int, gas_upper_bound: int, priority: TxPriority,
                                 gas_estimation_method: GasEstimationMethod,
