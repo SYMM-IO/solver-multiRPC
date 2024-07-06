@@ -2,7 +2,6 @@ import asyncio
 import enum
 import json
 import logging
-import threading
 import time
 from functools import reduce, wraps
 from threading import Thread
@@ -32,6 +31,18 @@ class ReturnableThread(Thread):
 
     def run(self) -> None:
         self.result = self.target(*self.args, **self.kwargs)
+
+
+class ResultEvent(asyncio.Event):
+    def __init__(self):
+        super().__init__()
+        self.result_ = None
+
+    def set_result(self, result):
+        self.result_ = result
+
+    def get_result(self):
+        return self.result_
 
 
 def thread_safe(func):

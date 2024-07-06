@@ -5,6 +5,7 @@ from typing import Callable, Union
 from typing import List, Dict, Optional
 
 import requests
+from aiohttp import ClientResponseError
 from requests import JSONDecodeError, RequestException, ReadTimeout, ConnectionError
 from web3 import Web3, AsyncWeb3
 from web3.types import Wei
@@ -20,7 +21,7 @@ class GasEstimation:
     def __init__(
             self,
             chain_id: int,
-            providers: List,
+            providers: List[AsyncWeb3],
             default_method: Optional[GasEstimationMethod] = None,
             apm_client=None,
             gas_multiplier_low: Union[float, Decimal] = 1,
@@ -91,10 +92,10 @@ class GasEstimation:
                 "maxPriorityFeePerGas": Web3.to_wei(max_priority_fee_per_gas, "GWei"),
             }
             return gas_params
-        except (RequestException, JSONDecodeError, KeyError):
+        except (RequestException, JSONDecodeError, KeyError) as e:
             if not DevEnv:
                 logging.exception(f'Failed to get gas info from metaswap {resp.status_code=}')
-            raise FailedToGetGasPrice("Failed to get gas info from api")
+            raise FailedToGetGasPrice(f"Failed to get gas info from api: {e}")
 
     async def _get_gas_from_rpc(self, priority: TxPriority, gas_upper_bound: Union[float, Decimal]) -> Dict[str, Wei]:
         gas_price = None
@@ -108,8 +109,12 @@ class GasEstimation:
                 if gas_price / 1e9 <= gas_upper_bound:
                     found_gas_below_upper_bound = True
                     break
-            except (ConnectionError, ReadTimeout, ValueError) as e:
+            except (ConnectionError, ReadTimeout, ValueError, ConnectionResetError) as e:
                 logging.error(f"Failed to get gas price from {rpc_url}, {e=}")
+            except ClientResponseError as e:
+                if e.message.startswith("Too Many Requests"):
+                    logging.error(f"Failed to get gas price from {rpc_url}, {e=}")
+                raise
 
         if gas_price is None:
             raise FailedToGetGasPrice("Non of RCP could provide gas price!")

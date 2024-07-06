@@ -1,5 +1,6 @@
+import asyncio
 import logging
-from typing import Union, Dict, Optional, List
+from typing import Union, Dict, Optional
 
 from eth_typing import Address, ChecksumAddress
 from web3._utils.contracts import encode_transaction_data  # noqa
@@ -10,9 +11,7 @@ from .base_multi_rpc_interface import BaseContractFunction
 from .constants import ViewPolicy
 from .exceptions import DontHaveThisRpcType
 from .gas_estimation import GasEstimation, GasEstimationMethod
-from .utils import TxPriority, NestedDict, ContractFunctionType
-
-logging.basicConfig(level=logging.INFO)
+from .utils import TxPriority, NestedDict, ContractFunctionType, thread_safe
 
 
 class AsyncMultiRpc(BaseMultiRpc):
@@ -20,6 +19,7 @@ class AsyncMultiRpc(BaseMultiRpc):
     This class is used to be more sure when running web3 view calls and sending transactions by using of multiple RPCs.
     """
 
+    @thread_safe
     def __init__(
             self,
             rpc_urls: NestedDict,
@@ -32,9 +32,11 @@ class AsyncMultiRpc(BaseMultiRpc):
             apm=None,
             enable_gas_estimation: bool = False,
             is_proof_authority: bool = False,
+            multicall_custom_address: str = None,
+            log_level: logging = logging.WARN
     ):
         super().__init__(rpc_urls, contract_address, contract_abi, view_policy, gas_estimation, gas_limit,
-                         gas_upper_bound, apm, enable_gas_estimation, is_proof_authority)
+                         gas_upper_bound, apm, enable_gas_estimation, is_proof_authority, log_level)
 
         for func_abi in self.contract_abi:
             if func_abi.get("stateMutability") in ("view", "pure"):
@@ -47,6 +49,7 @@ class AsyncMultiRpc(BaseMultiRpc):
                 func_abi["name"],
                 self.ContractFunction(func_abi["name"], func_abi, self, function_type),
             )
+        asyncio.run(self.setup(multicall_custom_address=multicall_custom_address))
 
     async def get_nonce(self, address: Union[Address, ChecksumAddress, str]) -> int:
         return await super()._get_nonce(address)
@@ -57,7 +60,7 @@ class AsyncMultiRpc(BaseMultiRpc):
     async def get_block(self, block_identifier: BlockIdentifier, full_transactions: bool = False) -> BlockData:
         return await super().get_block(block_identifier, full_transactions)
 
-    async def get_block_number(self) -> List[int]:
+    async def get_block_number(self) -> int:
         return await super().get_block_number()
 
     class ContractFunction(BaseContractFunction):
