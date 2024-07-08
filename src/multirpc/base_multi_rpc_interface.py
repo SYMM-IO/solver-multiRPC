@@ -1,39 +1,34 @@
 import asyncio
 import logging
 import time
-import web3
 from abc import ABC
 from concurrent.futures import ThreadPoolExecutor
+from time import sleep
+from typing import List, Union, Tuple, Coroutine, Dict, Optional, TypeVar, Callable
+
+import web3
 from eth_account import Account
 from eth_account.datastructures import SignedTransaction
 from eth_account.signers.local import LocalAccount
 from eth_typing import Address, ChecksumAddress
 from multicallable.async_multicallable import AsyncCall, AsyncMulticall
 from requests import ConnectionError, ReadTimeout, HTTPError
-from time import sleep
-from typing import List, Union, Tuple, Coroutine, Dict, Optional, Callable, TypeVar
 from web3 import Web3, AsyncWeb3
 from web3._utils.contracts import encode_transaction_data  # noqa
 from web3.contract import Contract
 from web3.exceptions import TimeExhausted, TransactionNotFound, BlockNotFound
 from web3.types import BlockData, BlockIdentifier, TxReceipt
 
+from .constants import mrpc_cntr, ViewPolicy
 from .exceptions import (
     FailedOnAllRPCs,
     TransactionFailedStatus,
-    Web3InterfaceException, TransactionValueError, GetBlockFailed,
+    Web3InterfaceException, TransactionValueError, GetBlockFailed, DontHaveThisRpcType, NotValidViewPolicy,
 )
 from .gas_estimation import GasEstimation, GasEstimationMethod
+from .tx_trace import TxTrace
 from .utils import TxPriority, get_span_proper_label_from_provider, get_unix_time, NestedDict, create_web3_from_rpc, \
-    calculate_chain_id, reduce_list_of_list
-
-logging.basicConfig(level=logging.INFO)
-
-
-class ContractFunctionType:
-    View = "view"
-    Transaction = "transaction"
-
+    calculate_chain_id, reduce_list_of_list, ResultEvent
 
 T = TypeVar("T")
 
@@ -48,12 +43,14 @@ class BaseMultiRpc(ABC):
             rpc_urls: NestedDict,
             contract_address: Union[Address, ChecksumAddress, str],
             contract_abi: Dict,
+            view_policy: ViewPolicy = ViewPolicy.MostUpdated,
             gas_estimation: Optional[GasEstimation] = None,
             gas_limit: int = 1_000_000,
             gas_upper_bound: int = 26_000,
             apm=None,
             enable_gas_estimation: bool = False,
             is_proof_authority: bool = False,
+            log_level: logging = logging.WARN
     ):
         self.rpc_urls = rpc_urls
 
@@ -68,6 +65,7 @@ class BaseMultiRpc(ABC):
 
         self.functions = type("functions", (object,), {})()
 
+        self.view_policy = view_policy
         self.gas_limit = gas_limit
         self.gas_upper_bound = gas_upper_bound
         self.enable_gas_estimation = enable_gas_estimation
@@ -76,6 +74,8 @@ class BaseMultiRpc(ABC):
         self.private_key = None
         self.chain_id = None
         self.is_proof_authority = is_proof_authority
+
+        logging.basicConfig(level=log_level)
 
     def _logger_params(self, **kwargs) -> None:
         if self.apm:
@@ -91,18 +91,20 @@ class BaseMultiRpc(ABC):
             address: sender public_key
             private_key: sender private key
         """
+        mrpc_cntr.incr_cur_func()
         self.address = Web3.to_checksum_address(address)
         self.private_key = private_key
 
     async def setup(self, multicall_custom_address: str = None) -> None:
+        mrpc_cntr.incr_cur_func()
         self.providers = await create_web3_from_rpc(self.rpc_urls, self.is_proof_authority)
         self.chain_id = await calculate_chain_id(self.providers)
 
-        if self.gas_estimation is None:
+        if self.gas_estimation is None and self.providers.get('transaction'):
             self.gas_estimation = GasEstimation(
                 self.chain_id,
                 reduce_list_of_list(self.providers['transaction'].values()),
-                # GasEstimationMethod.METAMASK,
+                # GasEstimationMethod.RPC,
             )
 
         is_rpc_provided = False
@@ -131,7 +133,8 @@ class BaseMultiRpc(ABC):
             raise ValueError("No available rpc provided")
 
     @staticmethod
-    async def __gather_tasks(execution_list: List[Coroutine]) -> List[any]:
+    async def __gather_tasks(execution_list: List[Coroutine], result_selector: Callable[[List], any],
+                             view_policy: ViewPolicy = ViewPolicy.MostUpdated):
         """
         Get an execution list and wait for all to end. If all executable raise an exception, it will raise a
         'Web3InterfaceException' exception, otherwise returns all results which has no exception
@@ -141,22 +144,48 @@ class BaseMultiRpc(ABC):
         Returns:
 
         """
-        with ThreadPoolExecutor() as executor:
-            base_results = executor.map(asyncio.run, execution_list)
-        results = [res for res in base_results if not isinstance(res, Exception)]
-        if len(results) == 0:
-            exceptions = [res for res in base_results if isinstance(res, Exception)]
-            for exc in exceptions:
-                logging.exception(exc)
-            raise Web3InterfaceException(
-                f"All of RPCs raise exception. first exception: {exceptions[0]}"
-            )
-        return results
 
-    async def __call_view_function(self,
-                                   func_name: str,
-                                   block_identifier: Union[str, int] = 'latest',
-                                   *args, **kwargs) -> List[any]:
+        def wrap_coroutine(coro: Coroutine):
+            def sync_wrapper():
+                try:
+                    res = asyncio.run(coro)
+                    return res, None
+                except Exception as e:
+                    return None, e
+
+            return sync_wrapper
+
+        mrpc_cntr.incr_cur_func()
+
+        if view_policy == view_policy.MostUpdated:  # wait for all task to be completed
+            results = []
+            exceptions = []
+            with ThreadPoolExecutor() as executor:
+                wrapped_coroutines = [wrap_coroutine(coro) for coro in execution_list]
+                for result, exception in executor.map(lambda f: f(), wrapped_coroutines):
+                    if exception:
+                        exceptions.append(exception)
+                    else:
+                        results.append(result)
+
+            if len(results) == 0:
+                for exc in exceptions:
+                    logging.exception(exc)
+                raise FailedOnAllRPCs(f"All of RPCs raise exception. first exception: {exceptions[0]}")
+            return result_selector(results)
+        elif view_policy == view_policy.FirstSuccess:  # wait to at least 1 task completed
+            return result_selector([await BaseMultiRpc.__execute_batch_tasks(
+                execution_list,
+                [HTTPError, ConnectionError, ValueError],
+                FailedOnAllRPCs
+            )])
+
+        raise NotValidViewPolicy()
+
+    async def _call_view_function(self,
+                                  func_name: str,
+                                  block_identifier: Union[str, int] = 'latest',
+                                  *args, **kwargs):
         """
         Calling view function 'func_name' by using of multicall
 
@@ -168,6 +197,17 @@ class BaseMultiRpc(ABC):
         Returns:
             the results of multicallable object for each rpc
         """
+
+        def max_block_finder(results: List):
+            max_block_number = results[0][0]
+            max_index = 0
+            for i, result in enumerate(results):
+                if result[0] > max_block_number:
+                    max_block_number = result[0]
+                    max_index = i
+            return results[max_index][2][0]
+
+        mrpc_cntr.incr_cur_func()
         for contracts, multi_calls in zip(self.contracts['view'].values(),
                                           self.multi_calls['view'].values()):  # type: any, List[AsyncMulticall]
             rpc_bracket = list(map(lambda c: c.w3.provider.endpoint_uri, contracts))
@@ -176,19 +216,21 @@ class BaseMultiRpc(ABC):
             execution_list = [mc.call([call], block_identifier=block_identifier) for mc, call in
                               zip(multi_calls, calls)]
             try:
-                return await self.__gather_tasks(execution_list)
+                return await self.__gather_tasks(execution_list, max_block_finder, view_policy=self.view_policy)
             except (Web3InterfaceException, asyncio.TimeoutError):
                 logging.info(f"Can't call view function from this list of rpc({rpc_bracket})")
         raise Web3InterfaceException("All of RPCs raise exception.")
 
     async def _get_nonce(self, address: Union[Address, ChecksumAddress, str]) -> int:
+        mrpc_cntr.incr_cur_func()
         address = Web3.to_checksum_address(address)
-        for providers in self.providers['view'].values():
+        providers_4_nonce = self.providers.get('view') or self.providers['transaction']
+        for providers in providers_4_nonce.values():
             execution_list = [
                 prov.eth.get_transaction_count(address) for prov in providers
             ]
             try:
-                return max(await self.__gather_tasks(execution_list))
+                return await self.__gather_tasks(execution_list, max)
             except (Web3InterfaceException, asyncio.TimeoutError) as e:
                 logging.warning(f"get_nounce: {e}")
                 pass
@@ -209,18 +251,19 @@ class BaseMultiRpc(ABC):
 
     @staticmethod
     async def _build_transaction(contract: Contract, func_name: str, func_args: Tuple,
-                                 func_kwargs: Dict, tx_params: Dict) -> Coroutine:
+                                 func_kwargs: Dict, tx_params: Dict):
         func_args = func_args or []
         func_kwargs = func_kwargs or {}
-        return await contract.functions.__getattribute__(func_name)(
-            *func_args, **func_kwargs
-        ).build_transaction(tx_params)
+        return await contract.functions.__getattribute__(func_name)(*func_args, **func_kwargs
+                                                                    ).build_transaction(tx_params)
 
     async def _build_and_sign_transaction(
             self, contract: Contract, provider: AsyncWeb3, func_name: str, func_args: Tuple,
             func_kwargs: Dict, signer_private_key: str, tx_params: Dict,
             enable_gas_estimation: bool) -> SignedTransaction:
+        mrpc_cntr.incr_cur_func()
         try:
+            mrpc_cntr('_build_and_sign_transaction end')
             tx = await self._build_transaction(contract, func_name, func_args, func_kwargs, tx_params)
             account: LocalAccount = Account.from_key(signer_private_key)
             if enable_gas_estimation:
@@ -228,25 +271,23 @@ class BaseMultiRpc(ABC):
                 logging.info(f"gas_estimation({estimate_gas} gas needed) is successful")
             return account.sign_transaction(tx)
         except Exception as e:
-            logging.error(
-                "exception in build and sign transaction: %s, %s",
-                e.__class__.__name__,
-                str(e),
-            )
+            logging.error("exception in build and sign transaction: %s, %s", e.__class__.__name__, str(e))
+            mrpc_cntr(f'unknown ex {e.__class__.__name__}')
             raise
 
-    async def _send_transaction(self, provider: web3.AsyncWeb3, raw_transaction: any,
-                                cancel_event: asyncio.Event) -> Tuple[AsyncWeb3, any]:
+    async def _send_transaction(self, provider: web3.AsyncWeb3, raw_transaction: any) -> Tuple[AsyncWeb3, any]:
+        mrpc_cntr.incr_cur_func()
         rpc_url = provider.provider.endpoint_uri
         try:
             rpc_label_prefix = get_span_proper_label_from_provider(rpc_url)
             transaction = await provider.eth.send_raw_transaction(raw_transaction)
             self._logger_params(**{f"{rpc_label_prefix}_post_send_time": get_unix_time()})
             self._logger_params(tx_send_time=int(time.time() * 1000))
-            cancel_event.set()
+            mrpc_cntr('_send_transaction end')
             return provider, transaction
         except ValueError as e:
             logging.error(f"RPC({rpc_url}) value error: {str(e)}")
+            mrpc_cntr(f'ValueError {str(e)[:30]}')
             t_bnb_flag = "transaction would cause overdraft" in str(e).lower() and (await provider.eth.chain_id) == 97
             if not (
                     t_bnb_flag or
@@ -257,25 +298,52 @@ class BaseMultiRpc(ABC):
                     'exceeds the configured cap' in str(e).lower()
             ):
                 logging.exception("_send_transaction_exception")
-                raise
+            raise
         except (ConnectionError, ReadTimeout, HTTPError) as e:  # FIXME complete list
             logging.debug(f"network exception in send transaction: {e.__class__.__name__}, {str(e)}")
+            mrpc_cntr(f'net ex {e.__class__.__name__}')
+            raise
         except Exception as e:
             # FIXME needs better exception handling
             logging.error(f"exception in send transaction: {e.__class__.__name__}, {str(e)}")
+            mrpc_cntr(f'unknown ex {e.__class__.__name__}')
+            raise
 
-    async def _wait_and_get_tx_receipt(self, provider: AsyncWeb3, tx, timeout: float, cancel_event: asyncio.Event) \
-            -> AsyncWeb3:
+    def _handle_tx_trace(self, trace: TxTrace, func_name: str, func_args: Tuple, func_kwargs: Dict):
+        """
+        You can override this method to customize handling failed transaction.
+
+        example:
+            if "out of gas" in trace.text():
+                raise InsufficientGasBalance(f'out of gas in {func_name}')
+            if "PartyBFacet: Will be liquidatable" in trace.text():
+                raise PartyBWillBeLiquidatable(f'partyB will be liquidatable in {func_name}')
+            if "LibMuon: TSS not verified" in trace.text():
+                raise TssNotVerified(Web3.to_hex(tx), func_name, func_args, func_kwargs, trace)
+            if trace.ok():
+                logging.error(f'TraceTransaction({func_name}): {trace.result().long_error()}')
+                mrpc_cntr(f'tr-failed-{func_name}-{trace.result().long_error()}')
+                apm.capture_message(param_message={
+                    'message': f'tr failed ({func_name}, {trace.result().first_usable_error()}): %s',
+                    'params': (trace.text(),),
+                })
+        """
+
+        pass
+
+    async def _wait_and_get_tx_receipt(self, provider: AsyncWeb3, tx, timeout: float, func_name: str,
+                                       func_args: Tuple, func_kwargs: Dict) -> Tuple[AsyncWeb3, TxReceipt]:
+        mrpc_cntr.incr_cur_func()
         con_err_count = tx_err_count = 0
         rpc_url = provider.provider.endpoint_uri
         while True:
             try:
-                receipt = await provider.eth.wait_for_transaction_receipt(tx, timeout=timeout)
                 self._logger_params(received_provider=rpc_url)
-                if receipt.status != 1:
-                    raise TransactionFailedStatus(Web3.to_hex(tx))
-                cancel_event.set()
-                return provider
+                if (tx_receipt := await provider.eth.wait_for_transaction_receipt(tx, timeout=timeout)).status != 1:
+                    trace = TxTrace(Web3.to_hex(tx))
+                    self._handle_tx_trace(trace, func_name, func_args, func_kwargs)
+                    raise TransactionFailedStatus(Web3.to_hex(tx), func_name, func_args, func_kwargs, trace)
+                return provider, tx_receipt
             except ConnectionError:
                 if con_err_count >= 5:
                     raise
@@ -289,36 +357,47 @@ class BaseMultiRpc(ABC):
 
     @staticmethod
     async def __execute_batch_tasks(
-            execution_params_list: List[Tuple],
-            task_factory: Callable[..., Coroutine[any, any, T]],
+            execution_list: List[Coroutine[None, None, T]],
             exception_handler: Optional[List[type[BaseException]]] = None,
             final_exception: Optional[type[BaseException]] = None
     ) -> T:
-        cancel_event = asyncio.Event()
+
+        async def exec_task(task: Coroutine, cancel_event: ResultEvent, lock: asyncio.Lock):
+            res = await task
+            async with lock:
+                cancel_event.set_result(res)
+            cancel_event.set()
+
+        mrpc_cntr.incr_cur_func()
+
+        cancel_event = ResultEvent()
+        lock = asyncio.Lock()
+
         tasks = [
-            asyncio.create_task(task_factory(*params, cancel_event=cancel_event))
-            for params in execution_params_list
+            asyncio.create_task(exec_task(task, cancel_event, lock))
+            for task in execution_list
         ]
         not_completed_tasks = tasks.copy()
-        result = None
         exception = None
+        terminal_exception = None
 
         while len(not_completed_tasks) > 0:
-            task, not_completed_tasks = await asyncio.wait(
+            dones, not_completed_tasks = await asyncio.wait(
                 not_completed_tasks, return_when=asyncio.FIRST_COMPLETED
             )
-            task = list(task)[0]
-            e = task.exception()
 
-            if e:
-                if exception_handler and e in exception_handler:
-                    exception = e
-                else:
-                    exception = e
+            for task in list(dones):
+                e = task.exception()
+                if e:
+                    if exception_handler and isinstance(e, tuple(exception_handler)):
+                        exception = e
+                    else:
+                        terminal_exception = e
+                    continue
+                if cancel_event.is_set():
                     break
 
-            if cancel_event.is_set():
-                result = task.result()
+            if cancel_event.is_set() or terminal_exception:
                 break
 
         # Cancel the remaining tasks
@@ -328,10 +407,10 @@ class BaseMultiRpc(ABC):
         await asyncio.gather(*tasks, return_exceptions=True)
 
         if cancel_event.is_set():
-            return result
-        if exception:
-            raise exception
-        raise final_exception
+            return cancel_event.get_result()
+        if terminal_exception or exception:
+            raise terminal_exception or exception
+        raise final_exception or RuntimeError("Execution completed without setting a result or exception.")
 
     async def __call_tx(
             self,
@@ -344,20 +423,20 @@ class BaseMultiRpc(ABC):
             contracts: List[Contract],
             tx_params: Dict,
             enable_gas_estimation: bool,
-    ) -> str:
+    ) -> Union[str, TxReceipt]:
+        mrpc_cntr.incr_cur_func()
         signed_transaction = await self._build_and_sign_transaction(
             contracts[0], providers[0], func_name, func_args, func_kwargs, private_key, tx_params, enable_gas_estimation
         )
         tx_hash = Web3.to_hex(signed_transaction.hash)
         self._logger_params(tx_hash=tx_hash)
 
-        execution_tx_params_list = [
-            (p, signed_transaction.rawTransaction) for p in providers
+        execution_tx_list = [
+            self._send_transaction(p, signed_transaction.raw_transaction) for p in providers
         ]
         result = await self.__execute_batch_tasks(
-            execution_tx_params_list,
-            self._send_transaction,
-            [TransactionValueError],
+            execution_tx_list,
+            [TransactionValueError, ValueError, ConnectionError, ReadTimeout, HTTPError],
             FailedOnAllRPCs
         )
         provider, tx = result
@@ -368,33 +447,20 @@ class BaseMultiRpc(ABC):
 
         if not wait_for_receipt:
             return tx_hash
-        execution_receipt_params_list = [
-            (p, tx, wait_for_receipt) for p in providers
+        execution_receipt_list = [
+            self._wait_and_get_tx_receipt(p, tx, wait_for_receipt, func_name, func_args, func_kwargs) for p in providers
         ]
-        _ = await self.__execute_batch_tasks(
-            execution_receipt_params_list,
-            self._wait_and_get_tx_receipt,
+        provider, tx_receipt = await self.__execute_batch_tasks(
+            execution_receipt_list,
             [TimeExhausted, TransactionNotFound, ConnectionError],
         )
 
-        return tx_hash
-
-    async def _call_view_function(self,
-                                  func_name: str,
-                                  block_identifier: Union[str, int] = 'latest',
-                                  *args, **kwargs) -> bytes:
-        results = await self.__call_view_function(func_name, block_identifier, *args, **kwargs)
-        max_block_number = results[0][0]
-        max_index = 0
-        for i, result in enumerate(results):
-            if result[0] > max_block_number:
-                max_block_number = result[0]
-                max_index = i
-        return results[max_index][2][0]
+        return tx_receipt
 
     async def _call_tx_function(self, address: str, gas_limit: int, gas_upper_bound: int, priority: TxPriority,
                                 gas_estimation_method: GasEstimationMethod,
                                 enable_gas_estimation: Optional[bool] = None, **kwargs):
+        mrpc_cntr.incr_cur_func()
         nonce = await self._get_nonce(address)
         tx_params = await self._get_tx_params(
             nonce, address, gas_limit, gas_upper_bound, priority, gas_estimation_method
@@ -410,26 +476,27 @@ class BaseMultiRpc(ABC):
                 raise
             except (ConnectionError, ReadTimeout, TimeExhausted, TransactionNotFound, FailedOnAllRPCs):
                 pass
-        raise Web3InterfaceException("All of RPCs raise exception.")
-
-    async def get_tx_receipt(self, tx_hash) -> TxReceipt:
-        async def _get_tx_receipt(p: AsyncWeb3, transaction_hash, cancel_event: asyncio.Event) -> TxReceipt:
-            try:
-                receipt = await p.eth.wait_for_transaction_receipt(transaction_hash)
-                cancel_event.set()
-                return receipt
             except Exception:
                 raise
+        raise Web3InterfaceException("All of RPCs raise exception.")
+
+    def check_for_view(self):
+        if self.providers.get('view') is None:
+            raise DontHaveThisRpcType(f"Doesn't have view RPCs")
+
+    async def get_tx_receipt(self, tx_hash) -> TxReceipt:
+        mrpc_cntr.incr_cur_func()
+
+        self.check_for_view()
 
         exceptions = (HTTPError, ConnectionError, ReadTimeout, ValueError, TimeExhausted, TransactionNotFound)
 
         last_exception = None
         for provider in self.providers['view'].values():  # type: List[AsyncWeb3]
-            execution_tx_params_list = [(p, tx_hash) for p in provider]
+            execution_tx_list = [p.eth.wait_for_transaction_receipt(tx_hash) for p in provider]
             try:
                 return await self.__execute_batch_tasks(
-                    execution_tx_params_list,
-                    _get_tx_receipt,
+                    execution_tx_list,
                     list(exceptions),
                     TransactionFailedStatus
                 )
@@ -441,27 +508,41 @@ class BaseMultiRpc(ABC):
         raise last_exception
 
     async def get_block(self, block_identifier: BlockIdentifier, full_transactions: bool = False) -> BlockData:
-        async def _get_block(p: AsyncWeb3, block_number: BlockIdentifier, full_tx: bool,
-                             cancel_event: asyncio.Event) -> BlockData:
-            try:
-                receipt = await p.eth.get_block(block_number, full_tx)
-                cancel_event.set()
-                return receipt
-            except Exception:
-                raise
+        mrpc_cntr.incr_cur_func()
+        self.check_for_view()
 
         exceptions = (HTTPError, ConnectionError, ReadTimeout, ValueError, TimeExhausted, BlockNotFound)
-
         last_exception = None
         for provider in self.providers['view'].values():  # type: List[AsyncWeb3]
-            execution_tx_params_list = [(p, block_identifier, full_transactions) for p in provider]
+            execution_tx_params_list = [p.eth.get_block(block_identifier, full_transactions) for p in provider]
             try:
                 return await self.__execute_batch_tasks(
                     execution_tx_params_list,
-                    _get_block,
                     list(exceptions),
                     GetBlockFailed
                 )
+            except exceptions as e:
+                last_exception = e
+                pass
+            except GetBlockFailed:
+                raise
+        raise last_exception
+
+    async def get_block_number(self) -> int:
+        mrpc_cntr.incr_cur_func()
+        self.check_for_view()
+
+        exceptions = (HTTPError, ConnectionError, ReadTimeout, ValueError, TimeExhausted)
+        last_exception = None
+        for provider in self.providers['view'].values():  # type: List[AsyncWeb3]
+            execution_tx_params_list = [asyncio.to_thread(p.eth.get_block_number) for p in provider]
+            try:
+                result = await self.__execute_batch_tasks(
+                    execution_tx_params_list,
+                    list(exceptions),
+                    GetBlockFailed
+                )
+                return await result
             except exceptions as e:
                 last_exception = e
                 pass
