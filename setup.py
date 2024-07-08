@@ -13,6 +13,5 @@ setup(
         'web3>=6.0.0',
         'multicallable>=6.0.0',
         'eth-account>=0.12.2',
-        'logmon @ git+https://zxcode.xyz/pub/logmon.git@73c1bfe9',
     ],
 )

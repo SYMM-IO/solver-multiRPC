@@ -19,7 +19,7 @@ from web3.contract import Contract
 from web3.exceptions import TimeExhausted, TransactionNotFound, BlockNotFound
 from web3.types import BlockData, BlockIdentifier, TxReceipt
 
-from .constants import mrpc_cntr, ViewPolicy
+from .constants import ViewPolicy
 from .exceptions import (
     FailedOnAllRPCs,
     TransactionFailedStatus,
@@ -91,12 +91,10 @@ class BaseMultiRpc(ABC):
             address: sender public_key
             private_key: sender private key
         """
-        mrpc_cntr.incr_cur_func()
         self.address = Web3.to_checksum_address(address)
         self.private_key = private_key
 
     async def setup(self, multicall_custom_address: str = None) -> None:
-        mrpc_cntr.incr_cur_func()
         self.providers = await create_web3_from_rpc(self.rpc_urls, self.is_proof_authority)
         self.chain_id = await calculate_chain_id(self.providers)
 
@@ -155,8 +153,6 @@ class BaseMultiRpc(ABC):
 
             return sync_wrapper
 
-        mrpc_cntr.incr_cur_func()
-
         if view_policy == view_policy.MostUpdated:  # wait for all task to be completed
             results = []
             exceptions = []
@@ -207,7 +203,6 @@ class BaseMultiRpc(ABC):
                     max_index = i
             return results[max_index][2][0]
 
-        mrpc_cntr.incr_cur_func()
         for contracts, multi_calls in zip(self.contracts['view'].values(),
                                           self.multi_calls['view'].values()):  # type: any, List[AsyncMulticall]
             rpc_bracket = list(map(lambda c: c.w3.provider.endpoint_uri, contracts))
@@ -222,7 +217,6 @@ class BaseMultiRpc(ABC):
         raise Web3InterfaceException("All of RPCs raise exception.")
 
     async def _get_nonce(self, address: Union[Address, ChecksumAddress, str]) -> int:
-        mrpc_cntr.incr_cur_func()
         address = Web3.to_checksum_address(address)
         providers_4_nonce = self.providers.get('view') or self.providers['transaction']
         for providers in providers_4_nonce.values():
@@ -261,9 +255,7 @@ class BaseMultiRpc(ABC):
             self, contract: Contract, provider: AsyncWeb3, func_name: str, func_args: Tuple,
             func_kwargs: Dict, signer_private_key: str, tx_params: Dict,
             enable_gas_estimation: bool) -> SignedTransaction:
-        mrpc_cntr.incr_cur_func()
         try:
-            mrpc_cntr('_build_and_sign_transaction end')
             tx = await self._build_transaction(contract, func_name, func_args, func_kwargs, tx_params)
             account: LocalAccount = Account.from_key(signer_private_key)
             if enable_gas_estimation:
@@ -272,22 +264,18 @@ class BaseMultiRpc(ABC):
             return account.sign_transaction(tx)
         except Exception as e:
             logging.error("exception in build and sign transaction: %s, %s", e.__class__.__name__, str(e))
-            mrpc_cntr(f'unknown ex {e.__class__.__name__}')
             raise
 
     async def _send_transaction(self, provider: web3.AsyncWeb3, raw_transaction: any) -> Tuple[AsyncWeb3, any]:
-        mrpc_cntr.incr_cur_func()
         rpc_url = provider.provider.endpoint_uri
         try:
             rpc_label_prefix = get_span_proper_label_from_provider(rpc_url)
             transaction = await provider.eth.send_raw_transaction(raw_transaction)
             self._logger_params(**{f"{rpc_label_prefix}_post_send_time": get_unix_time()})
             self._logger_params(tx_send_time=int(time.time() * 1000))
-            mrpc_cntr('_send_transaction end')
             return provider, transaction
         except ValueError as e:
             logging.error(f"RPC({rpc_url}) value error: {str(e)}")
-            mrpc_cntr(f'ValueError {str(e)[:30]}')
             t_bnb_flag = "transaction would cause overdraft" in str(e).lower() and (await provider.eth.chain_id) == 97
             if not (
                     t_bnb_flag or
@@ -301,12 +289,10 @@ class BaseMultiRpc(ABC):
             raise
         except (ConnectionError, ReadTimeout, HTTPError) as e:  # FIXME complete list
             logging.debug(f"network exception in send transaction: {e.__class__.__name__}, {str(e)}")
-            mrpc_cntr(f'net ex {e.__class__.__name__}')
             raise
         except Exception as e:
             # FIXME needs better exception handling
             logging.error(f"exception in send transaction: {e.__class__.__name__}, {str(e)}")
-            mrpc_cntr(f'unknown ex {e.__class__.__name__}')
             raise
 
     def _handle_tx_trace(self, trace: TxTrace, func_name: str, func_args: Tuple, func_kwargs: Dict):
@@ -322,7 +308,6 @@ class BaseMultiRpc(ABC):
                 raise TssNotVerified(Web3.to_hex(tx), func_name, func_args, func_kwargs, trace)
             if trace.ok():
                 logging.error(f'TraceTransaction({func_name}): {trace.result().long_error()}')
-                mrpc_cntr(f'tr-failed-{func_name}-{trace.result().long_error()}')
                 apm.capture_message(param_message={
                     'message': f'tr failed ({func_name}, {trace.result().first_usable_error()}): %s',
                     'params': (trace.text(),),
@@ -333,7 +318,6 @@ class BaseMultiRpc(ABC):
 
     async def _wait_and_get_tx_receipt(self, provider: AsyncWeb3, tx, timeout: float, func_name: str,
                                        func_args: Tuple, func_kwargs: Dict) -> Tuple[AsyncWeb3, TxReceipt]:
-        mrpc_cntr.incr_cur_func()
         con_err_count = tx_err_count = 0
         rpc_url = provider.provider.endpoint_uri
         while True:
@@ -367,8 +351,6 @@ class BaseMultiRpc(ABC):
             async with lock:
                 cancel_event.set_result(res)
             cancel_event.set()
-
-        mrpc_cntr.incr_cur_func()
 
         cancel_event = ResultEvent()
         lock = asyncio.Lock()
@@ -424,7 +406,6 @@ class BaseMultiRpc(ABC):
             tx_params: Dict,
             enable_gas_estimation: bool,
     ) -> Union[str, TxReceipt]:
-        mrpc_cntr.incr_cur_func()
         signed_transaction = await self._build_and_sign_transaction(
             contracts[0], providers[0], func_name, func_args, func_kwargs, private_key, tx_params, enable_gas_estimation
         )
@@ -460,7 +441,6 @@ class BaseMultiRpc(ABC):
     async def _call_tx_function(self, address: str, gas_limit: int, gas_upper_bound: int, priority: TxPriority,
                                 gas_estimation_method: GasEstimationMethod,
                                 enable_gas_estimation: Optional[bool] = None, **kwargs):
-        mrpc_cntr.incr_cur_func()
         nonce = await self._get_nonce(address)
         tx_params = await self._get_tx_params(
             nonce, address, gas_limit, gas_upper_bound, priority, gas_estimation_method
@@ -485,8 +465,6 @@ class BaseMultiRpc(ABC):
             raise DontHaveThisRpcType(f"Doesn't have view RPCs")
 
     async def get_tx_receipt(self, tx_hash) -> TxReceipt:
-        mrpc_cntr.incr_cur_func()
-
         self.check_for_view()
 
         exceptions = (HTTPError, ConnectionError, ReadTimeout, ValueError, TimeExhausted, TransactionNotFound)
@@ -508,7 +486,6 @@ class BaseMultiRpc(ABC):
         raise last_exception
 
     async def get_block(self, block_identifier: BlockIdentifier, full_transactions: bool = False) -> BlockData:
-        mrpc_cntr.incr_cur_func()
         self.check_for_view()
 
         exceptions = (HTTPError, ConnectionError, ReadTimeout, ValueError, TimeExhausted, BlockNotFound)
@@ -529,7 +506,6 @@ class BaseMultiRpc(ABC):
         raise last_exception
 
     async def get_block_number(self) -> int:
-        mrpc_cntr.incr_cur_func()
         self.check_for_view()
 
         exceptions = (HTTPError, ConnectionError, ReadTimeout, ValueError, TimeExhausted)
