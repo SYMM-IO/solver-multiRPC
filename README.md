@@ -108,6 +108,8 @@ Call a function from your contract:
 ```python
 result = await multi_rpc.functions.YOUR_FUNCTION().call()
 ```
+By default we return tx_receipt(wait for 90 second).
+if you don't want to return tx_receipt, pass `wait_for_receipt=0` to `call()` 
 
 ### Calling Contract with another Private Key
 
