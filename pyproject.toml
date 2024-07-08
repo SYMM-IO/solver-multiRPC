@@ -1,4 +1,6 @@
 [build-system]
+name = "solver-multiRPC"
+version = "3.0.0"
 requires = [
     "setuptools>=42",
     "wheel"
