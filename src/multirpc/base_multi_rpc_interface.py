@@ -16,7 +16,7 @@ from requests import ConnectionError, ReadTimeout, HTTPError
 from web3 import Web3, AsyncWeb3
 from web3._utils.contracts import encode_transaction_data  # noqa
 from web3.contract import Contract
-from web3.exceptions import TimeExhausted, TransactionNotFound, BlockNotFound
+from web3.exceptions import TimeExhausted, TransactionNotFound, BlockNotFound, BadResponseFormat
 from web3.types import BlockData, BlockIdentifier, TxReceipt
 
 from .constants import ViewPolicy
@@ -166,7 +166,7 @@ class BaseMultiRpc(ABC):
 
             if len(results) == 0:
                 for exc in exceptions:
-                    logging.exception(exc)
+                    logging.exception(f"RAISED EXCEPTION: {exc}")
                 raise FailedOnAllRPCs(f"All of RPCs raise exception. first exception: {exceptions[0]}")
             return result_selector(results)
         elif view_policy == view_policy.FirstSuccess:  # wait to at least 1 task completed
@@ -216,12 +216,13 @@ class BaseMultiRpc(ABC):
                 logging.info(f"Can't call view function from this list of rpc({rpc_bracket})")
         raise Web3InterfaceException("All of RPCs raise exception.")
 
-    async def _get_nonce(self, address: Union[Address, ChecksumAddress, str]) -> int:
+    async def _get_nonce(self, address: Union[Address, ChecksumAddress, str],
+                         block_identifier: Optional[BlockIdentifier] = None) -> int:
         address = Web3.to_checksum_address(address)
         providers_4_nonce = self.providers.get('view') or self.providers['transaction']
         for providers in providers_4_nonce.values():
             execution_list = [
-                prov.eth.get_transaction_count(address) for prov in providers
+                prov.eth.get_transaction_count(address, block_identifier=block_identifier) for prov in providers
             ]
             try:
                 return await self.__gather_tasks(execution_list, max)
@@ -252,9 +253,16 @@ class BaseMultiRpc(ABC):
                                                                     ).build_transaction(tx_params)
 
     async def _build_and_sign_transaction(
-            self, contract: Contract, provider: AsyncWeb3, func_name: str, func_args: Tuple,
-            func_kwargs: Dict, signer_private_key: str, tx_params: Dict,
-            enable_gas_estimation: bool) -> SignedTransaction:
+            self,
+            contract: Contract,
+            provider: AsyncWeb3,
+            func_name: str,
+            func_args: Tuple,
+            func_kwargs: Dict,
+            signer_private_key: str,
+            tx_params: Dict,
+            enable_gas_estimation: bool
+    ) -> SignedTransaction:
         try:
             tx = await self._build_transaction(contract, func_name, func_args, func_kwargs, tx_params)
             account: LocalAccount = Account.from_key(signer_private_key)
@@ -293,6 +301,8 @@ class BaseMultiRpc(ABC):
         except Exception as e:
             # FIXME needs better exception handling
             logging.error(f"exception in send transaction: {e.__class__.__name__}, {str(e)}")
+            if self.apm:
+                self.apm.capture_exception()
             raise
 
     def _handle_tx_trace(self, trace: TxTrace, func_name: str, func_args: Tuple, func_kwargs: Dict):
@@ -433,7 +443,8 @@ class BaseMultiRpc(ABC):
         ]
         provider, tx_receipt = await self.__execute_batch_tasks(
             execution_receipt_list,
-            [TimeExhausted, TransactionNotFound, ConnectionError],
+            [TimeExhausted, TransactionNotFound, ConnectionError, ReadTimeout,
+             ValueError, BadResponseFormat, HTTPError],
         )
 
         return tx_receipt
