@@ -1,10 +1,13 @@
-[project]
+[build-system]
 name = "solver-multiRPC"
-version = "3.0.0"
+requires = [
+    "setuptools>=42",
+    "wheel"
+]
+version = "3.0.3"
 dependencies = [
     "web3>=6.0.0",
     "multicallable>=6.0.0",
     "eth-account>=0.12.2",
 ]
-[tool.setuptools]
-package-dir = {"" = "src"}
+build-backend = "setuptools.build_meta"
