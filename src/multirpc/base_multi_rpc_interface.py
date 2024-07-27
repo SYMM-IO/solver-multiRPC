@@ -202,7 +202,7 @@ class BaseMultiRpc(ABC):
                     max_block_number = result[0]
                     max_index = i
             return results[max_index][2][0]
-
+        last_error = None
         for contracts, multi_calls in zip(self.contracts['view'].values(),
                                           self.multi_calls['view'].values()):  # type: any, List[AsyncMulticall]
             rpc_bracket = list(map(lambda c: c.w3.provider.endpoint_uri, contracts))
@@ -212,13 +212,15 @@ class BaseMultiRpc(ABC):
                               zip(multi_calls, calls)]
             try:
                 return await self.__gather_tasks(execution_list, max_block_finder, view_policy=self.view_policy)
-            except (Web3InterfaceException, asyncio.TimeoutError):
-                logging.info(f"Can't call view function from this list of rpc({rpc_bracket})")
-        raise Web3InterfaceException("All of RPCs raise exception.")
+            except (Web3InterfaceException, asyncio.TimeoutError) as e:
+                last_error = e
+                logging.info(f"Can't call view function from this list of rpc({rpc_bracket}), error: {e}")
+        raise Web3InterfaceException(f"All of RPCs raise exception. {last_error=}")
 
     async def _get_nonce(self, address: Union[Address, ChecksumAddress, str]) -> int:
         address = Web3.to_checksum_address(address)
         providers_4_nonce = self.providers.get('view') or self.providers['transaction']
+        last_error = None
         for providers in providers_4_nonce.values():
             execution_list = [
                 prov.eth.get_transaction_count(address) for prov in providers
@@ -226,9 +228,10 @@ class BaseMultiRpc(ABC):
             try:
                 return await self.__gather_tasks(execution_list, max)
             except (Web3InterfaceException, asyncio.TimeoutError) as e:
+                last_error = e
                 logging.warning(f"get_nounce: {e}")
                 pass
-        raise Web3InterfaceException("All of RPCs raise exception.")
+        raise Web3InterfaceException(f"All of RPCs raise exception. {last_error=}")
 
     async def _get_tx_params(
             self, nonce: int, address: str, gas_limit: int, gas_upper_bound: int, priority:
@@ -445,6 +448,7 @@ class BaseMultiRpc(ABC):
         tx_params = await self._get_tx_params(
             nonce, address, gas_limit, gas_upper_bound, priority, gas_estimation_method
         )
+        last_error = None
         enable_gas_estimation = self.enable_gas_estimation if enable_gas_estimation is None else enable_gas_estimation
         for p, c in zip(
                 self.providers['transaction'].values(), self.contracts['transaction'].values()
@@ -454,11 +458,11 @@ class BaseMultiRpc(ABC):
                                             enable_gas_estimation=enable_gas_estimation)
             except (TransactionFailedStatus, TransactionValueError):
                 raise
-            except (ConnectionError, ReadTimeout, TimeExhausted, TransactionNotFound, FailedOnAllRPCs):
-                pass
+            except (ConnectionError, ReadTimeout, TimeExhausted, TransactionNotFound, FailedOnAllRPCs) as e:
+                last_error = e
             except Exception:
                 raise
-        raise Web3InterfaceException("All of RPCs raise exception.")
+        raise Web3InterfaceException(f"All of RPCs raise exception. {last_error=}")
 
     def check_for_view(self):
         if self.providers.get('view') is None:

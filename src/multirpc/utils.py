@@ -3,6 +3,7 @@ import enum
 import json
 import logging
 import time
+import traceback
 from functools import reduce, wraps
 from threading import Thread
 from typing import Dict, List, Tuple, Union
@@ -21,16 +22,40 @@ def get_span_proper_label_from_provider(endpoint_uri):
 
 
 class ReturnableThread(Thread):
-    # This class is a subclass of Thread that allows the thread to return a value.
     def __init__(self, target, args=(), kwargs=None):
         super().__init__(target=target, args=args, kwargs=kwargs)
         self.target = target
         self.args = args
-        self.kwargs = kwargs
+        self.kwargs = kwargs if kwargs is not None else {}
         self.result = None
+        self._exception = None
 
     def run(self) -> None:
-        self.result = self.target(*self.args, **self.kwargs)
+        try:
+            self.result = self.target(*self.args, **self.kwargs)
+        except Exception as e:
+            self._exception = e
+            traceback.print_exc()
+
+    def join(self, *args, **kwargs):
+        super().join(*args, **kwargs)
+        if self._exception:
+            raise self._exception
+        return self.result
+
+
+def thread_safe(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            asyncio.get_running_loop()
+            t = ReturnableThread(target=func, args=args, kwargs=kwargs)
+            t.start()
+            return t.join()
+        except RuntimeError:
+            return func(*args, **kwargs)
+
+    return wrapper
 
 
 class ResultEvent(asyncio.Event):
@@ -43,21 +68,6 @@ class ResultEvent(asyncio.Event):
 
     def get_result(self):
         return self.result_
-
-
-def thread_safe(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            asyncio.get_running_loop()
-            t = ReturnableThread(target=func, args=args, kwargs=kwargs)
-            t.start()
-            t.join()
-            return t.result
-        except RuntimeError:
-            return func(*args, **kwargs)
-
-    return wrapper
 
 
 def get_unix_time():
