@@ -301,7 +301,8 @@ class BaseMultiRpc(ABC):
                     'already known' in str(e).lower() or
                     'transaction underpriced' in str(e).lower() or
                     'account suspended' in str(e).lower() or
-                    'exceeds the configured cap' in str(e).lower()
+                    'exceeds the configured cap' in str(e).lower() or
+                    'no backends available for method' in str(e).lower()
             ):
                 logging.exception("_send_transaction_exception")
             raise
