@@ -205,6 +205,7 @@ class BaseMultiRpc(ABC):
             if use_multicall:
                 return results[max_index][2]
             return results[max_index][2][0]
+
         last_error = None
         for contracts, multi_calls in zip(self.contracts['view'].values(),
                                           self.multi_calls['view'].values()):  # type: any, List[AsyncMulticall]

@@ -132,6 +132,14 @@ _Note that the majority of free RPCs only support querying blocks up to 10 minut
 result = multi_rpc.functions.yourViewFunction().call(block_identifier='latest')  
 ```
 
+### Using multicall for view function Calls
+
+you can also use mutlicall. Here's an example:
+
+```python
+results = multi_rpc.functions.yourViewFunction([(param1, params2), (param1, params2)]).multicall()  
+```
+
 ### Passing View Policy
 
 You can specify a view policy to determine how view function calls are handled.
