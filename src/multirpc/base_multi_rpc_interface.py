@@ -181,6 +181,7 @@ class BaseMultiRpc(ABC):
     async def _call_view_function(self,
                                   func_name: str,
                                   block_identifier: Union[str, int] = 'latest',
+                                  use_multicall=False,
                                   *args, **kwargs):
         """
         Calling view function 'func_name' by using of multicall
@@ -201,14 +202,19 @@ class BaseMultiRpc(ABC):
                 if result[0] > max_block_number:
                     max_block_number = result[0]
                     max_index = i
+            if use_multicall:
+                return results[max_index][2]
             return results[max_index][2][0]
         last_error = None
         for contracts, multi_calls in zip(self.contracts['view'].values(),
                                           self.multi_calls['view'].values()):  # type: any, List[AsyncMulticall]
             rpc_bracket = list(map(lambda c: c.w3.provider.endpoint_uri, contracts))
 
-            calls = [AsyncCall(cont, func_name, args, kwargs) for cont in contracts]
-            execution_list = [mc.call([call], block_identifier=block_identifier) for mc, call in
+            if use_multicall:
+                calls = [[AsyncCall(cont, func_name, arg) for arg in args[0]] for cont in contracts]
+            else:
+                calls = [[AsyncCall(cont, func_name, args, kwargs)] for cont in contracts]
+            execution_list = [mc.call(call, block_identifier=block_identifier) for mc, call in
                               zip(multi_calls, calls)]
             try:
                 return await self.__gather_tasks(execution_list, max_block_finder, view_policy=self.view_policy)

@@ -86,12 +86,13 @@ class MultiRpc(BaseMultiRpc):
                 gas_estimation_method: GasEstimationMethod = None,
                 block_identifier: Union[str, int] = 'latest',
                 enable_gas_estimation: Optional[bool] = None,
+                use_multicall=False,
         ):
             if self.mr.providers.get(self.typ) is None:
                 raise DontHaveThisRpcType(f"Doesn't have {self.typ} RPCs")
             if self.typ == ContractFunctionType.View:
                 return asyncio.run(self.mr._call_view_function(
-                    self.name, block_identifier, *self.args, **self.kwargs,
+                    self.name, block_identifier, use_multicall, *self.args, **self.kwargs,
                 ))
             elif self.typ == ContractFunctionType.Transaction:
                 return asyncio.run(self.mr._call_tx_function(
