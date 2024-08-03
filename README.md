@@ -134,7 +134,7 @@ result = multi_rpc.functions.yourViewFunction().call(block_identifier='latest')
 
 ### Using multicall for view function Calls
 
-you can also use mutlicall. Here's an example:
+you can also use `mutlicall()` for calling a view function multiple time with different parameters. Here's an example:
 
 ```python
 results = multi_rpc.functions.yourViewFunction([(param1, params2), (param1, params2)]).multicall()  

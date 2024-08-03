@@ -38,7 +38,7 @@ async def async_main():
     print(f"Nonce: {await multi_rpc.get_nonce(address1)}")
     print(f"map({address1}): 0x{bytes(await multi_rpc.functions.map(address1).call()).hex()}")
 
-    results = await multi_rpc.functions.map([(address1,), (address2,)]).call(use_multicall=True)
+    results = await multi_rpc.functions.map([(address1,), (address2,)]).multicall()
     print(f"map({address1, address2}): {[f'0x{bytes(res).hex()}' for res in results]}")
     print(f"map({address1}) in {p_block=}: "
           f"0x{bytes(await multi_rpc.functions.map(address1).call(block_identifier=p_block)).hex()}")
@@ -71,7 +71,7 @@ def sync_main():
     print(f"Nonce: {multi_rpc.get_nonce(address1)}")
     print(f"map({address1}): 0x{bytes(multi_rpc.functions.map(address1).call()).hex()}")
 
-    results = multi_rpc.functions.map([(address1,), (address2,)]).call(use_multicall=True)
+    results = multi_rpc.functions.map([(address1,), (address2,)]).multicall()
     print(f"map({address1, address2}): {[f'0x{bytes(res).hex()}' for res in results]}")
     print(f"map({address1}) in {p_block=}: "
           f"0x{bytes(multi_rpc.functions.map(address1).call(block_identifier=p_block)).hex()}")

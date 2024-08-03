@@ -59,3 +59,12 @@ class DontHaveThisRpcType(Web3InterfaceException):
 
 class NotValidViewPolicy(Web3InterfaceException):
     pass
+
+
+class TransactionTypeNotSupportedInMultiCall(Web3InterfaceException):
+    pass
+
+
+class KwargsNotSupportedInMultiCall(Web3InterfaceException):
+    pass
+

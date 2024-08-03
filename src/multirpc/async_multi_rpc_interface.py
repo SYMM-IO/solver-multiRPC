@@ -9,7 +9,7 @@ from web3.types import BlockData, BlockIdentifier, TxReceipt
 from . import BaseMultiRpc
 from .base_multi_rpc_interface import BaseContractFunction
 from .constants import ViewPolicy
-from .exceptions import DontHaveThisRpcType
+from .exceptions import DontHaveThisRpcType, KwargsNotSupportedInMultiCall, TransactionTypeNotSupportedInMultiCall
 from .gas_estimation import GasEstimation, GasEstimationMethod
 from .utils import TxPriority, NestedDict, ContractFunctionType, thread_safe
 
@@ -81,13 +81,12 @@ class AsyncMultiRpc(BaseMultiRpc):
                 gas_estimation_method: GasEstimationMethod = None,
                 block_identifier: Union[str, int] = 'latest',
                 enable_gas_estimation: Optional[bool] = None,
-                use_multicall=False,
         ):
             if self.mr.providers.get(self.typ) is None:
                 raise DontHaveThisRpcType(f"Doesn't have {self.typ} RPCs")
             if self.typ == ContractFunctionType.View:
                 return await self.mr._call_view_function(
-                    self.name, block_identifier, use_multicall, *self.args, **self.kwargs,
+                    self.name, block_identifier, False, *self.args, **self.kwargs,
                 )
             elif self.typ == ContractFunctionType.Transaction:
                 return await self.mr._call_tx_function(
@@ -103,3 +102,18 @@ class AsyncMultiRpc(BaseMultiRpc):
                     gas_estimation_method=gas_estimation_method,
                     enable_gas_estimation=enable_gas_estimation
                 )
+
+        async def multicall(
+                self,
+                block_identifier: Union[str, int] = 'latest',
+        ):
+            if self.mr.providers.get(self.typ) is None:
+                raise DontHaveThisRpcType(f"Doesn't have {self.typ} RPCs")
+            if self.kwargs != {}:
+                raise KwargsNotSupportedInMultiCall
+            if self.typ == ContractFunctionType.View:
+                return await self.mr._call_view_function(
+                    self.name, block_identifier, True, *self.args, **self.kwargs,
+                )
+            elif self.typ == ContractFunctionType.Transaction:
+                raise TransactionTypeNotSupportedInMultiCall
