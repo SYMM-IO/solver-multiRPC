@@ -8,6 +8,6 @@ version = "3.0.5"
 dependencies = [
     "web3>=6.0.0",
     "multicallable>=6.0.0",
-    "eth-account>=0.12.2",
+    "eth-account<0.13.0",
 ]
 build-backend = "setuptools.build_meta"
