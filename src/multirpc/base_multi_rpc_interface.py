@@ -202,6 +202,7 @@ class BaseMultiRpc(ABC):
                 if result[0] > max_block_number:
                     max_block_number = result[0]
                     max_index = i
+            # fixme: why?
             if use_multicall:
                 return results[max_index][2]
             return results[max_index][2][0]

@@ -113,6 +113,7 @@ class MultiRpc(BaseMultiRpc):
                 self,
                 block_identifier: Union[str, int] = 'latest',
         ):
+            # fixme: why ?
             if self.mr.providers.get(self.typ) is None:
                 raise DontHaveThisRpcType(f"Doesn't have {self.typ} RPCs")
             if self.kwargs != {}:
