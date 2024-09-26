@@ -81,7 +81,7 @@ def sync_main():
 
     print("sync test was successful")
 
-# todo: write test for multicall view
+
 async def test():
     sync_main()
     await async_main()

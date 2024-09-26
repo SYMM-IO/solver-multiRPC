@@ -202,7 +202,6 @@ class BaseMultiRpc(ABC):
                 if result[0] > max_block_number:
                     max_block_number = result[0]
                     max_index = i
-            # fixme: why?
             if use_multicall:
                 return results[max_index][2]
             return results[max_index][2][0]
@@ -435,7 +434,7 @@ class BaseMultiRpc(ABC):
         self._logger_params(tx_hash=tx_hash)
 
         execution_tx_list = [
-            self._send_transaction(p, signed_transaction.raw_transaction) for p in providers
+            self._send_transaction(p, signed_transaction.rawTransaction) for p in providers
         ]
         result = await self.__execute_batch_tasks(
             execution_tx_list,
