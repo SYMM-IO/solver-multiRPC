@@ -32,7 +32,7 @@ async def async_main():
                               gas_estimation=None, enable_gas_estimation=True, log_level=LogLevel)
     multi_rpc.set_account(address1, private_key=PrivateKey1)
 
-    p_block = await multi_rpc.get_block_number() - 50
+    p_block = await multi_rpc.get_block_number() - 25
     print(f"tx_receipt: {await multi_rpc.get_tx_receipt(tx_hash)}")
     print(f"block: {await multi_rpc.get_block(block)}")
     print(f"Nonce: {await multi_rpc.get_nonce(address1)}")
@@ -65,7 +65,7 @@ def sync_main():
                          log_level=LogLevel)
     multi_rpc.set_account(address1, private_key=PrivateKey1)
 
-    p_block = multi_rpc.get_block_number() - 50
+    p_block = multi_rpc.get_block_number() - 25
     print(f"tx_receipt: {multi_rpc.get_tx_receipt(tx_hash)}")
     print(f"block: {multi_rpc.get_block(block)}")
     print(f"Nonce: {multi_rpc.get_nonce(address1)}")

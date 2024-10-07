@@ -221,7 +221,7 @@ class BaseMultiRpc(ABC):
                 return await self.__gather_tasks(execution_list, max_block_finder, view_policy=self.view_policy)
             except (Web3InterfaceException, asyncio.TimeoutError) as e:
                 last_error = e
-                logging.info(f"Can't call view function from this list of rpc({rpc_bracket}), error: {e}")
+                logging.warning(f"Can't call view function from this list of rpc({rpc_bracket}), error: {e}")
         raise Web3InterfaceException(f"All of RPCs raise exception. {last_error=}")
 
     async def _get_nonce(self, address: Union[Address, ChecksumAddress, str],
@@ -366,6 +366,33 @@ class BaseMultiRpc(ABC):
             exception_handler: Optional[List[type[BaseException]]] = None,
             final_exception: Optional[type[BaseException]] = None
     ) -> T:
+        """
+        Executes a batch of asynchronous tasks concurrently and returns the result of the first completed task.
+
+        This function runs multiple coroutines concurrently and waits for the first one to complete successfully.
+        If any task raises an exception, it checks whether the exception is in the `exception_handler` list.
+        If so, it stores the exception but continues execution. If a terminal exception occurs (not in the
+        `exception_handler` list), it cancels all remaining tasks and raises that exception.
+
+        Parameters:
+            execution_list (List[Coroutine[None, None, T]]): A list of coroutine objects to be executed concurrently.
+            exception_handler (Optional[List[type[BaseException]]], optional): A list of exception types to be handled
+                without terminating all tasks immediately. Exceptions of these types are stored and raised after
+                all tasks have been processed. Defaults to None.
+            final_exception (Optional[type[BaseException]], optional): An exception type to raise if no tasks complete
+                successfully and no terminal exceptions occur. Defaults to None.
+
+        Returns:
+            T: The result returned by the first task that completes successfully.
+
+        Raises:
+            BaseException: If a terminal exception occurs in any of the tasks, it is raised immediately.
+            BaseException: If all tasks fail with exceptions specified in `exception_handler`, the last exception is raised.
+            final_exception: If provided and no tasks complete successfully or raise terminal exceptions, this exception
+                is raised.
+            RuntimeError: If no tasks complete successfully and no exceptions are raised, a RuntimeError is raised.
+
+        """
 
         async def exec_task(task: Coroutine, cancel_event: ResultEvent, lock: asyncio.Lock):
             res = await task
@@ -534,14 +561,14 @@ class BaseMultiRpc(ABC):
         exceptions = (HTTPError, ConnectionError, ReadTimeout, ValueError, TimeExhausted)
         last_exception = None
         for provider in self.providers['view'].values():  # type: List[AsyncWeb3]
-            execution_tx_params_list = [asyncio.to_thread(p.eth.get_block_number) for p in provider]
+            execution_tx_params_list = [p.eth.get_block_number() for p in provider]
             try:
                 result = await self.__execute_batch_tasks(
                     execution_tx_params_list,
                     list(exceptions),
                     GetBlockFailed
                 )
-                return await result
+                return result
             except exceptions as e:
                 last_exception = e
                 pass
