@@ -305,6 +305,7 @@ class BaseMultiRpc(ABC):
                     'no backends available for method' in str(e).lower()
             ):
                 logging.exception("_send_transaction_exception")
+                raise TransactionValueError
             raise
         except (ConnectionError, ReadTimeout, HTTPError) as e:  # FIXME complete list
             logging.debug(f"network exception in send transaction: {e.__class__.__name__}, {str(e)}")
@@ -363,7 +364,7 @@ class BaseMultiRpc(ABC):
     @staticmethod
     async def __execute_batch_tasks(
             execution_list: List[Coroutine[None, None, T]],
-            exception_handler: Optional[List[type[BaseException]]] = None,
+            ignored_exceptions: Optional[List[type[BaseException]]] = None,
             final_exception: Optional[type[BaseException]] = None
     ) -> T:
         """
@@ -376,7 +377,7 @@ class BaseMultiRpc(ABC):
 
         Parameters:
             execution_list (List[Coroutine[None, None, T]]): A list of coroutine objects to be executed concurrently.
-            exception_handler (Optional[List[type[BaseException]]], optional): A list of exception types to be handled
+            ignored_exceptions (Optional[List[type[BaseException]]], optional): A list of exception types to be handled
                 without terminating all tasks immediately. Exceptions of these types are stored and raised after
                 all tasks have been processed. Defaults to None.
             final_exception (Optional[type[BaseException]], optional): An exception type to raise if no tasks complete
@@ -419,7 +420,7 @@ class BaseMultiRpc(ABC):
             for task in list(dones):
                 e = task.exception()
                 if e:
-                    if exception_handler and isinstance(e, tuple(exception_handler)):
+                    if ignored_exceptions and isinstance(e, tuple(ignored_exceptions)):
                         exception = e
                     else:
                         terminal_exception = e
@@ -465,7 +466,7 @@ class BaseMultiRpc(ABC):
         ]
         result = await self.__execute_batch_tasks(
             execution_tx_list,
-            [TransactionValueError, ValueError, ConnectionError, ReadTimeout, HTTPError],
+            [ValueError, ConnectionError, ReadTimeout, HTTPError],
             FailedOnAllRPCs
         )
         provider, tx = result
