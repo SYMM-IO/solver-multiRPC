@@ -4,10 +4,10 @@ requires = [
     "setuptools>=42",
     "wheel"
 ]
-version = "3.0.5"
+version = "3.0.6"
 dependencies = [
     "web3>=6.0.0",
     "multicallable>=6.0.0",
-    "eth-account<0.13.0",
+    "eth-account>=0.13.0",
 ]
 build-backend = "setuptools.build_meta"
