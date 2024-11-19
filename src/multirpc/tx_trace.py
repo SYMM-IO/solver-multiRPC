@@ -2,8 +2,6 @@ import logging
 
 import requests
 
-from .constants import Default_RPC as RPC
-
 
 class TxTrace:
     """
@@ -41,8 +39,9 @@ class TxTrace:
     }
     """
 
-    def __init__(self, tx_hash):
+    def __init__(self, tx_hash, rpc: str):
         self.tx_hash = tx_hash
+        self.rpc = rpc
         self.response = self.tx_trace()
         self._json = None
 
@@ -58,7 +57,7 @@ class TxTrace:
                 ]
             }
 
-            response = requests.post(RPC, json=data)
+            response = requests.post(self.rpc, json=data)
             if response.status_code == 200:
                 return response
             logging.error(f'tx_trace status = {response.status_code}')

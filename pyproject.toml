@@ -4,9 +4,9 @@ requires = [
     "setuptools>=42",
     "wheel"
 ]
-version = "3.0.6"
+version = "3.0.7"
 dependencies = [
-    "web3>=6.0.0",
+    "web3<7.0.0",
     "multicallable>=6.0.0",
     "eth-account>=0.13.0",
 ]

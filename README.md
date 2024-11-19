@@ -51,7 +51,7 @@ async def main():
     })
     with open("abi.json", "r") as f:
         abi = json.load(f)
-    multi_rpc = AsyncMultiRpc(rpcs, 'YOUR_CONTRACT_ADDRESS', contract_abi=abi, enable_gas_estimation=True)
+    multi_rpc = AsyncMultiRpc(rpcs, 'YOUR_CONTRACT_ADDRESS', contract_abi=abi, enable_estimate_gas_limit=True)
     multi_rpc.set_account("YOUR_PUBLIC_ADDRESS", "YOUR_PRIVATE_KEY")
 
     result = await multi_rpc.functions.YOUR_FUNCTION().call()
@@ -70,7 +70,7 @@ from multirpc import MultiRpc
 
 
 def main():
-    multi_rpc = MultiRpc(rpcs, 'YOUR_CONTRACT_ADDRESS', contract_abi=abi, enable_gas_estimation=True)
+    multi_rpc = MultiRpc(rpcs, 'YOUR_CONTRACT_ADDRESS', contract_abi=abi, enable_estimate_gas_limit=True)
     multi_rpc.set_account("YOUR_PUBLIC_ADDRESS", "YOUR_PRIVATE_KEY")
 
     result = multi_rpc.functions.YOUR_FUNCTION().call()
@@ -92,6 +92,9 @@ Initialize the `MultiRpc` class with your RPC URLs, contract address, and contra
 ```python
 multi_rpc = MultiRpc(rpcs, contract_address='YOUR_CONTRACT_ADDRESS', contract_abi=abi)
 ```
+- `enable_estimate_gas_limit=True` will check if tx can be done successfully without paying fee, 
+and also calculate gas limit for tx
+
 
 ### Setting Account
 

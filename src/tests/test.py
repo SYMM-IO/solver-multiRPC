@@ -10,6 +10,8 @@ from src.multirpc.sync_multi_rpc_interface import MultiRpc
 from src.tests.constants import ContractAddr, RPCs, abi
 from src.tests.test_settings import PrivateKey1, PrivateKey2, LogLevel
 
+PreviousBlock = 3
+
 
 async def async_test_map(mr: AsyncMultiRpc, addr: str = None, pk: str = None):
     random_hex = hex(random.randint(0x10, 0xff))
@@ -29,10 +31,10 @@ async def async_test_map(mr: AsyncMultiRpc, addr: str = None, pk: str = None):
 
 async def async_main():
     multi_rpc = AsyncMultiRpc(RPCs, contract_addr, view_policy=ViewPolicy.FirstSuccess, contract_abi=abi,
-                              gas_estimation=None, enable_gas_estimation=True, log_level=LogLevel)
+                              gas_estimation=None, enable_estimate_gas_limit=True, log_level=LogLevel)
     multi_rpc.set_account(address1, private_key=PrivateKey1)
 
-    p_block = await multi_rpc.get_block_number() - 25
+    p_block = await multi_rpc.get_block_number() - PreviousBlock
     print(f"tx_receipt: {await multi_rpc.get_tx_receipt(tx_hash)}")
     print(f"block: {await multi_rpc.get_block(block)}")
     print(f"Nonce: {await multi_rpc.get_nonce(address1)}")
@@ -61,11 +63,11 @@ def sync_test_map(mr: MultiRpc, addr: str = None, pk: str = None):
 
 
 def sync_main():
-    multi_rpc = MultiRpc(RPCs, contract_addr, contract_abi=abi, gas_estimation=None, enable_gas_estimation=True,
+    multi_rpc = MultiRpc(RPCs, contract_addr, contract_abi=abi, gas_estimation=None, enable_estimate_gas_limit=True,
                          log_level=LogLevel)
     multi_rpc.set_account(address1, private_key=PrivateKey1)
 
-    p_block = multi_rpc.get_block_number() - 25
+    p_block = multi_rpc.get_block_number() - PreviousBlock
     print(f"tx_receipt: {multi_rpc.get_tx_receipt(tx_hash)}")
     print(f"block: {multi_rpc.get_block(block)}")
     print(f"Nonce: {multi_rpc.get_nonce(address1)}")

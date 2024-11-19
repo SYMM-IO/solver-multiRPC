@@ -1,13 +1,6 @@
 import enum
 
-ChainIdToGas = {
-    97: 10.1,  # Test BNB Network
-    250: 60,  # ftm
-}
-GasFromRpcChainIds = [56, 8453]  # for this chain ids use rpc to estimate gas
-FixedValueGas = 30
 DEFAULT_API_PROVIDER = 'https://gas-api.metaswap.codefi.network/networks/{chain_id}/suggestedGasFees'
-Default_RPC = 'https://fantom.publicnode.com'
 
 
 class ViewPolicy(enum.Enum):
@@ -22,6 +15,22 @@ class GasEstimationMethod(enum.Enum):
     CUSTOM = 3
 
 
+GasLimit = 1_000_000
+GasUpperBound = 50_000
+
+GasMultiplierLow = 1.0
+GasMultiplierMedium = 1.3
+GasMultiplierHigh = 1.5
+
 MaxRPCInEachBracket = 3
+
+# config
+ChainIdToGas = {
+    97: 10.1,   # Test BNB Network
+    250: 20,    # ftm
+}
+GasFromRpcChainIds = []  # for this chain ids use rpc to estimate gas
+FixedValueGas = 30
+
 RequestTimeout = 30
 DevEnv = True

@@ -8,7 +8,7 @@ from web3.types import BlockData, BlockIdentifier, TxReceipt
 
 from . import BaseMultiRpc
 from .base_multi_rpc_interface import BaseContractFunction
-from .constants import ViewPolicy
+from .constants import GasLimit, GasUpperBound, ViewPolicy
 from .exceptions import DontHaveThisRpcType, KwargsNotSupportedInMultiCall, TransactionTypeNotSupportedInMultiCall
 from .gas_estimation import GasEstimation, GasEstimationMethod
 from .utils import TxPriority, NestedDict, ContractFunctionType, thread_safe
@@ -27,16 +27,16 @@ class AsyncMultiRpc(BaseMultiRpc):
             contract_abi: Dict,
             view_policy: ViewPolicy = ViewPolicy.MostUpdated,
             gas_estimation: Optional[GasEstimation] = None,
-            gas_limit: int = 1_000_000,
-            gas_upper_bound: int = 26_000,
+            gas_limit: int = GasLimit,
+            gas_upper_bound: int = GasUpperBound,
             apm=None,
-            enable_gas_estimation: bool = False,
+            enable_estimate_gas_limit: bool = False,
             is_proof_authority: bool = False,
             multicall_custom_address: str = None,
             log_level: logging = logging.WARN
     ):
         super().__init__(rpc_urls, contract_address, contract_abi, view_policy, gas_estimation, gas_limit,
-                         gas_upper_bound, apm, enable_gas_estimation, is_proof_authority, log_level)
+                         gas_upper_bound, apm, enable_estimate_gas_limit, is_proof_authority, log_level)
 
         for func_abi in self.contract_abi:
             if func_abi.get("stateMutability") in ("view", "pure"):
@@ -80,7 +80,7 @@ class AsyncMultiRpc(BaseMultiRpc):
                 priority: TxPriority = TxPriority.Low,
                 gas_estimation_method: GasEstimationMethod = None,
                 block_identifier: Union[str, int] = 'latest',
-                enable_gas_estimation: Optional[bool] = None,
+                enable_estimate_gas_limit: Optional[bool] = None,
         ):
             if self.mr.providers.get(self.typ) is None:
                 raise DontHaveThisRpcType(f"Doesn't have {self.typ} RPCs")
@@ -100,7 +100,7 @@ class AsyncMultiRpc(BaseMultiRpc):
                     wait_for_receipt=wait_for_receipt,
                     priority=priority,
                     gas_estimation_method=gas_estimation_method,
-                    enable_gas_estimation=enable_gas_estimation
+                    enable_estimate_gas_limit=enable_estimate_gas_limit
                 )
 
         async def multicall(

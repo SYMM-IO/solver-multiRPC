@@ -1,18 +1,17 @@
 import logging
 from _decimal import Decimal
 from decimal import Decimal
-from typing import Callable, Union
-from typing import List, Dict, Optional
+from typing import Callable, Dict, List, Optional, Union
 
 import requests
 from aiohttp import ClientResponseError
-from requests import JSONDecodeError, RequestException, ReadTimeout, ConnectionError
-from web3 import Web3, AsyncWeb3
+from requests import ConnectionError, JSONDecodeError, ReadTimeout, RequestException
+from web3 import AsyncWeb3, Web3
 from web3.types import Wei
 
-from .constants import ChainIdToGas, FixedValueGas, DEFAULT_API_PROVIDER, GasEstimationMethod, RequestTimeout, DevEnv, \
-    GasFromRpcChainIds
-from .exceptions import OutOfRangeTransactionFee, FailedToGetGasPrice
+from .constants import ChainIdToGas, DEFAULT_API_PROVIDER, DevEnv, FixedValueGas, GasEstimationMethod, \
+    GasFromRpcChainIds, GasMultiplierHigh, GasMultiplierLow, GasMultiplierMedium, RequestTimeout
+from .exceptions import FailedToGetGasPrice, OutOfRangeTransactionFee
 from .utils import TxPriority
 
 
@@ -24,23 +23,12 @@ class GasEstimation:
             providers: List[AsyncWeb3],
             default_method: Optional[GasEstimationMethod] = None,
             apm_client=None,
-            gas_multiplier_low: Union[float, Decimal] = 1,
-            gas_multiplier_medium: Union[float, Decimal] = 1,
-            gas_multiplier_high: Union[float, Decimal] = 1,
-            gas_api_provider: str = DEFAULT_API_PROVIDER
+            gas_multiplier_low: Union[float, Decimal] = GasMultiplierLow,
+            gas_multiplier_medium: Union[float, Decimal] = GasMultiplierMedium,
+            gas_multiplier_high: Union[float, Decimal] = GasMultiplierHigh,
+            gas_api_provider: str = DEFAULT_API_PROVIDER,
+            log_level: logging = logging.WARN
     ):
-        """
-
-        Args:
-            chain_id:
-            providers:
-            default_method:
-            apm_client:
-            gas_multiplier_low:
-            gas_multiplier_medium:
-            gas_multiplier_high:
-            gas_api_provider:
-        """
         self.gas_api_provider = gas_api_provider
         self.chain_id = chain_id
         self.providers = providers
@@ -63,6 +51,7 @@ class GasEstimation:
             GasEstimationMethod.FIXED,
             GasEstimationMethod.CUSTOM
         ]
+        logging.basicConfig(level=log_level)
 
     def __logger_params(self, **kwargs):
         if self.apm:
@@ -94,8 +83,8 @@ class GasEstimation:
             return gas_params
         except (RequestException, JSONDecodeError, KeyError) as e:
             if not DevEnv:
-                logging.exception(f'Failed to get gas info from metaswap {resp.status_code=}')
-            raise FailedToGetGasPrice(f"Failed to get gas info from api: {e}")
+                logging.exception(f'Failed to get gas info from api({self.chain_id=}) {resp.status_code=}')
+            raise FailedToGetGasPrice(f"Failed to get gas info from api({self.chain_id=}): {e}")
 
     async def _get_gas_from_rpc(self, priority: TxPriority, gas_upper_bound: Union[float, Decimal]) -> Dict[str, Wei]:
         gas_price = None
@@ -122,7 +111,7 @@ class GasEstimation:
             raise OutOfRangeTransactionFee(
                 f"gas price exceeded. {gas_upper_bound=} but it is {gas_price / 1e9}"
             )
-        return {'gasPrice': Wei(gas_price * self.multipliers.get(priority, 1))}
+        return {'gasPrice': Wei(int(gas_price * self.multipliers.get(priority, 1)))}
 
     async def _get_fixed_value(self, priority: TxPriority, gas_upper_bound: Union[float, Decimal]) -> Dict[str, Wei]:
         gas = ChainIdToGas.get(self.chain_id) or FixedValueGas
@@ -134,7 +123,7 @@ class GasEstimation:
         raise NotImplemented()
 
     async def get_gas_price(
-            self, gas_upper_bound: float, priority: TxPriority, method: GasEstimationMethod = None
+            self, gas_upper_bound: int, priority: TxPriority, method: GasEstimationMethod = None
     ) -> Dict[str, Wei]:
         if method := self.gas_estimation_method.get(method) or self.gas_estimation_method.get(self.default_method):
             try:

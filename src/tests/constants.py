@@ -17,3 +17,5 @@ RPCs = NestedDict({
 
 with open("tests/abi.json", "r") as f:
     abi = json.load(f)
+
+PreviousBlock = 3
