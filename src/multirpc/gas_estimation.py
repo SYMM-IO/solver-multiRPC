@@ -11,7 +11,7 @@ from web3.types import Wei
 
 from .constants import ChainIdToGas, DEFAULT_API_PROVIDER, DevEnv, FixedValueGas, GasEstimationMethod, \
     GasFromRpcChainIds, GasMultiplierHigh, GasMultiplierLow, GasMultiplierMedium, RequestTimeout
-from .exceptions import FailedToGetGasPrice, OutOfRangeTransactionFee
+from .exceptions import FailedToGetGasFromApi, FailedToGetGasPrice, OutOfRangeTransactionFee
 from .utils import TxPriority
 
 
@@ -64,6 +64,8 @@ class GasEstimation:
         resp = None
         try:
             resp = requests.get(gas_provider, timeout=RequestTimeout)
+            if resp.status_code != 200:
+                raise FailedToGetGasFromApi(f'failed to get gas with {resp.status_code=} on {gas_provider=}')
             resp_json = resp.json()
             max_fee_per_gas = Decimal(resp_json[priority.value]["suggestedMaxFeePerGas"])
             max_priority_fee_per_gas = Decimal(resp_json[priority.value]["suggestedMaxPriorityFeePerGas"])
