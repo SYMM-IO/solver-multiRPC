@@ -16,10 +16,10 @@ PreviousBlock = 3
 async def async_test_map(mr: AsyncMultiRpc, addr: str = None, pk: str = None):
     random_hex = hex(random.randint(0x10, 0xff))
     print(f"Random hex: {random_hex}")
-    await mr.functions.set(random_hex).call(address=addr, private_key=pk,
-                                            gas_estimation_method=GasEstimationMethod.GAS_API_PROVIDER)
-    await mr.functions.set(random_hex).call(address=addr, private_key=pk,
-                                            gas_estimation_method=GasEstimationMethod.FIXED)
+    # await mr.functions.set(random_hex).call(address=addr, private_key=pk,
+    #                                         gas_estimation_method=GasEstimationMethod.GAS_API_PROVIDER)
+    # await mr.functions.set(random_hex).call(address=addr, private_key=pk,
+    #                                         gas_estimation_method=GasEstimationMethod.FIXED)
     tx_receipt = await mr.functions.set(random_hex).call(address=addr, private_key=pk,
                                                          gas_estimation_method=GasEstimationMethod.RPC)
     print(f"{tx_receipt=}")
@@ -31,7 +31,8 @@ async def async_test_map(mr: AsyncMultiRpc, addr: str = None, pk: str = None):
 
 async def async_main():
     multi_rpc = AsyncMultiRpc(RPCs, contract_addr, view_policy=ViewPolicy.FirstSuccess, contract_abi=abi,
-                              gas_estimation=None, enable_estimate_gas_limit=True, log_level=LogLevel)
+                              gas_estimation=None, enable_estimate_gas_limit=False, enable_max_gas_limit=True,
+                              log_level=LogLevel)
     multi_rpc.set_account(address1, private_key=PrivateKey1)
 
     p_block = await multi_rpc.get_block_number() - PreviousBlock
@@ -40,7 +41,7 @@ async def async_main():
     print(f"Nonce: {await multi_rpc.get_nonce(address1)}")
     print(f"map({address1}): 0x{bytes(await multi_rpc.functions.map(address1).call()).hex()}")
 
-    results = await multi_rpc.functions.map([(address1,), (address2,)]).multicall()
+    results = await multi_rpc.functions.map([(address1,), (address2,)]*100).multicall()
     print(f"map({address1, address2}): {[f'0x{bytes(res).hex()}' for res in results]}")
     print(f"map({address1}) in {p_block=}: "
           f"0x{bytes(await multi_rpc.functions.map(address1).call(block_identifier=p_block)).hex()}")
@@ -85,7 +86,7 @@ def sync_main():
 
 
 async def test():
-    sync_main()
+    # sync_main()
     await async_main()
 
 
