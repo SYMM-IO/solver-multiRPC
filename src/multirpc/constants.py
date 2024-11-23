@@ -25,7 +25,8 @@ GasMultiplierHigh = 1.5
 MaxRPCInEachBracket = 3
 
 # config
-EstimateGasLimitBuffer = 4000
+# It must be greater than 1, so we have a safe margin to ensure the transaction can be successful.
+EstimateGasLimitBuffer = 1.1
 MaxGasLimitDivider = 1e8
 ChainIdToGas = {
     97: 10.1,   # Test BNB Network

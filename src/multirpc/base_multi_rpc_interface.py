@@ -308,7 +308,7 @@ class BaseMultiRpc(ABC):
             if enable_estimate_gas_limit and not self.enable_max_gas_limit:
                 estimate_gas = await provider.eth.estimate_gas(tx)
                 logging.info(f"gas_estimation({estimate_gas} gas needed) is successful")
-                return account.sign_transaction({**tx, 'gas': estimate_gas + EstimateGasLimitBuffer})
+                return account.sign_transaction({**tx, 'gas': int(estimate_gas * EstimateGasLimitBuffer)})
             elif self.enable_max_gas_limit:
                 return account.sign_transaction({**tx, 'gas': self.max_gas_limit})
             return account.sign_transaction(tx)

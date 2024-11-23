@@ -69,6 +69,7 @@ class GasEstimation:
             resp_json = resp.json()
             max_fee_per_gas = Decimal(resp_json[priority.value]["suggestedMaxFeePerGas"])
             max_priority_fee_per_gas = Decimal(resp_json[priority.value]["suggestedMaxPriorityFeePerGas"])
+            base_fee = Decimal(resp_json[priority.value]["estimatedBaseFee"])
             self.__logger_params(
                 max_fee_per_gas=max_fee_per_gas,
                 max_priority_fee_per_gas=max_priority_fee_per_gas,
@@ -79,6 +80,7 @@ class GasEstimation:
                     f"gas price exceeded. {gas_upper_bound=} but it is {max_fee_per_gas}"
                 )
             gas_params = {
+                'baseFee': Web3.to_wei(base_fee, "GWei"),
                 "maxFeePerGas": Web3.to_wei(max_fee_per_gas, "GWei"),
                 "maxPriorityFeePerGas": Web3.to_wei(max_priority_fee_per_gas, "GWei"),
             }
