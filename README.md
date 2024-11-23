@@ -200,7 +200,6 @@ custom_gas_estimation = CustomGasEstimation(
     chain_id=1,
     providers=[],
     default_method=GasEstimationMethod.CUSTOM,
-    gas_api_provider=''
 )
 
 # Use it with MultiRpc

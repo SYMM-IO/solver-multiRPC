@@ -62,7 +62,8 @@ BaseConfig = ChainConfigTest(
             1: ['https://1rpc.io/base', 'https://mainnet.base.org'],
         }
     }),
-    '0xbd342d36d503af057cd79fd4f252b4629d6013d0748a2742dc99c9fcbe522072'
+    '0xbd342d36d503af057cd79fd4f252b4629d6013d0748a2742dc99c9fcbe522072',
+    is_proof_authority=True
 )
 
 

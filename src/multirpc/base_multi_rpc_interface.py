@@ -240,8 +240,7 @@ class BaseMultiRpc(ABC):
                 calls = [[AsyncCall(cont, func_name, arg) for arg in args[0]] for cont in contracts]
             else:
                 calls = [[AsyncCall(cont, func_name, args, kwargs)] for cont in contracts]
-            execution_list = [mc.call(call, block_identifier=block_identifier) for mc, call in
-                              zip(multi_calls, calls)]
+            execution_list = [mc.call(call, block_identifier=block_identifier) for mc, call in zip(multi_calls, calls)]
             try:
                 return await self.__gather_tasks(execution_list, max_block_finder, view_policy=self.view_policy)
             except (Web3InterfaceException, asyncio.TimeoutError) as e:

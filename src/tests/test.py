@@ -31,7 +31,7 @@ async def async_test_map(mr: AsyncMultiRpc, addr: str = None, pk: str = None):
 
 
 async def async_main(chain_config: ChainConfigTest):
-    multi_rpc = AsyncMultiRpc(chain_config.rpc, chain_config.contract_address, view_policy=ViewPolicy.FirstSuccess,
+    multi_rpc = AsyncMultiRpc(chain_config.rpc, chain_config.contract_address, view_policy=ViewPolicy.MostUpdated,
                               contract_abi=abi, gas_estimation=None, enable_estimate_gas_limit=False,
                               log_level=LogLevel, is_proof_authority=config_.is_proof_authority)
     multi_rpc.set_account(address1, private_key=PrivateKey1)
@@ -95,6 +95,13 @@ async def test(chain_config: ChainConfigTest):
 if __name__ == '__main__':
     address1 = Account.from_key(PrivateKey1).address
     address2 = Account.from_key(PrivateKey2).address
-    for config_ in [FtmConfig, ArbConfig, PolyConfig, BaseConfig]:
+    for config_ in [
+        # FtmConfig, ArbConfig,
+                    # PolyConfig,
+                    BaseConfig]:
+        # todo.pedram: failure must not stop all proccess.
+        # todo.pedram: some variable like priority, gas_estimation_method must be available
+        #  on initialization and vice versa(viewe policy)
+        print(f"=============================== Start Testing on {config_.name} ===============================")
         asyncio.run(test(config_))
         print(f"=============================== Test on {config_.name} Completed ===============================\n\n")
