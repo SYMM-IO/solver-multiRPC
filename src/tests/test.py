@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import random
 
 from eth_account import Account
@@ -88,20 +89,26 @@ def sync_main(chain_config: ChainConfigTest):
 
 
 async def test(chain_config: ChainConfigTest):
-    # sync_main(contract, tx_hash, rpc)
-    await async_main(chain_config)
+    try:
+        sync_main(chain_config)
+    except Exception as e:
+        logging.error(e)
+
+    try:
+        await async_main(chain_config)
+    except Exception as e:
+        logging.error(e)
 
 
 if __name__ == '__main__':
     address1 = Account.from_key(PrivateKey1).address
     address2 = Account.from_key(PrivateKey2).address
     for config_ in [
-        # FtmConfig, ArbConfig,
-                    # PolyConfig,
-                    BaseConfig]:
-        # todo.pedram: failure must not stop all proccess.
-        # todo.pedram: some variable like priority, gas_estimation_method must be available
-        #  on initialization and vice versa(viewe policy)
+        FtmConfig,
+        ArbConfig,
+        PolyConfig,
+        BaseConfig
+    ]:
         print(f"=============================== Start Testing on {config_.name} ===============================")
         asyncio.run(test(config_))
         print(f"=============================== Test on {config_.name} Completed ===============================\n\n")

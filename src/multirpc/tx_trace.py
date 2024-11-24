@@ -45,6 +45,9 @@ class TxTrace:
         self.response = self.tx_trace()
         self._json = None
 
+    def __repr__(self):
+        return f'{self.tx_hash}-{self.response and self.response.text}'
+
     def tx_trace(self):
         try:
             data = {
@@ -59,8 +62,12 @@ class TxTrace:
 
             response = requests.post(self.rpc, json=data)
             if response.status_code == 200:
+                if error := response.json().get('error'):
+                    logging.error(f'failed to get tx({self.tx_hash}) trace with error: {error}')
+                    return None
                 return response
-            logging.error(f'tx_trace status = {response.status_code}')
+            logging.error(f'tx_trace({self.tx_hash}) status = {response.status_code}, \n {response.json()}')
+
         except requests.HTTPError:
             logging.exception('Exception in debug_traceTransaction')
 
@@ -82,13 +89,16 @@ class TxTrace:
         return self._json
 
     def result(self):
-        return TxTraceResult(result=self.json().get('result', {}))
+        return TxTraceResult(result=self.json().get('result') or {})
 
 
 class TxTraceResult:
 
     def __init__(self, result):
         self._json = result
+
+    def __repr__(self):
+        return f'{self._json}'
 
     def get(self, key, default=None):
         return self._json.get(key, default)
@@ -97,7 +107,7 @@ class TxTraceResult:
         return self.get('error')
 
     def revert_reason(self):
-        return self.get('revertReason')
+        return self.get('revertReason', '')
 
     def from_(self):
         return self.get('from')
@@ -132,6 +142,9 @@ class TxTraceResult:
 
     def first_usable_error(self):
         for error in [self.error()] + self.all_revert_reasons():
-            if 'execution reverted' not in error and 'MultiAccount: Error occurred' not in error:
+            if error and \
+                    'execution reverted' not in error and \
+                    'MultiAccount: Error occurred' not in error and \
+                    'Execution reverted' not in error:
                 return error
         return ''
