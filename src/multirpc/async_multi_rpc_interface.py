@@ -1,18 +1,17 @@
 import asyncio
 import logging
-from typing import Annotated, Union, Dict, Optional
+from typing import Dict, Optional, Union
 
-from annotated_types import Gt
 from eth_typing import Address, ChecksumAddress
 from web3._utils.contracts import encode_transaction_data  # noqa
 from web3.types import BlockData, BlockIdentifier, TxReceipt
 
 from . import BaseMultiRpc
 from .base_multi_rpc_interface import BaseContractFunction
-from .constants import GasLimit, GasUpperBound, MaxGasLimitDivider, ViewPolicy
+from .constants import GasLimit, GasUpperBound, ViewPolicy
 from .exceptions import DontHaveThisRpcType, KwargsNotSupportedInMultiCall, TransactionTypeNotSupportedInMultiCall
 from .gas_estimation import GasEstimation, GasEstimationMethod
-from .utils import TxPriority, NestedDict, ContractFunctionType, thread_safe
+from .utils import ContractFunctionType, NestedDict, TxPriority, thread_safe
 
 
 class AsyncMultiRpc(BaseMultiRpc):
@@ -32,8 +31,6 @@ class AsyncMultiRpc(BaseMultiRpc):
             gas_upper_bound: int = GasUpperBound,
             apm=None,
             enable_estimate_gas_limit: bool = False,
-            enable_max_gas_limit: bool = False,
-            max_gas_limit_divider: Annotated[int, Gt(0)] = MaxGasLimitDivider,
             is_proof_authority: bool = False,
             multicall_custom_address: str = None,
             log_level: logging = logging.WARN
@@ -41,7 +38,6 @@ class AsyncMultiRpc(BaseMultiRpc):
         super().__init__(rpc_urls, contract_address, contract_abi,
                          view_policy, gas_estimation, gas_limit,
                          gas_upper_bound, apm, enable_estimate_gas_limit,
-                         enable_max_gas_limit, max_gas_limit_divider,
                          is_proof_authority, log_level)
 
         for func_abi in self.contract_abi:

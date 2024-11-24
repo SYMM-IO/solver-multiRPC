@@ -18,10 +18,10 @@ PreviousBlock = 3
 async def async_test_map(mr: AsyncMultiRpc, addr: str = None, pk: str = None):
     random_hex = hex(random.randint(0x10, 0xff))
     print(f"Random hex: {random_hex}")
-    # await mr.functions.set(random_hex).call(address=addr, private_key=pk,
-    #                                         gas_estimation_method=GasEstimationMethod.GAS_API_PROVIDER)
-    # await mr.functions.set(random_hex).call(address=addr, private_key=pk,
-    #                                         gas_estimation_method=GasEstimationMethod.FIXED)
+    await mr.functions.set(random_hex).call(address=addr, private_key=pk,
+                                            gas_estimation_method=GasEstimationMethod.GAS_API_PROVIDER)
+    await mr.functions.set(random_hex).call(address=addr, private_key=pk,
+                                            gas_estimation_method=GasEstimationMethod.FIXED)
     tx_receipt = await mr.functions.set(random_hex).call(address=addr, private_key=pk,
                                                          gas_estimation_method=GasEstimationMethod.RPC)
     print(f"{tx_receipt=}")
@@ -33,8 +33,8 @@ async def async_test_map(mr: AsyncMultiRpc, addr: str = None, pk: str = None):
 
 async def async_main(chain_config: ChainConfigTest):
     multi_rpc = AsyncMultiRpc(chain_config.rpc, chain_config.contract_address, view_policy=ViewPolicy.MostUpdated,
-                              contract_abi=abi, gas_estimation=None, enable_estimate_gas_limit=False,
-                              log_level=LogLevel, is_proof_authority=config_.is_proof_authority)
+                              contract_abi=abi, gas_estimation=None, log_level=LogLevel,
+                              is_proof_authority=config_.is_proof_authority)
     multi_rpc.set_account(address1, private_key=PrivateKey1)
 
     p_block = await multi_rpc.get_block_number() - PreviousBlock

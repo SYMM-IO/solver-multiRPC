@@ -94,9 +94,6 @@ multi_rpc = MultiRpc(rpcs, contract_address='YOUR_CONTRACT_ADDRESS', contract_ab
 ```
 - `enable_estimate_gas_limit=True` will check if tx can be done successfully without paying fee, 
 and also calculate gas limit for tx
-- `enable_max_gas_limit=True` in some cases estimate_gas may fail,
-then you can use this option to set gas_limit to max amount a block can have on this chain. **warning**
-- **warning**: a higher gas limit means your transaction is less likely to be included by miners, it also increases gas usage
 
 ### Setting Account
 
