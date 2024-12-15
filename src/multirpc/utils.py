@@ -198,6 +198,9 @@ class ChainConfigTest:
     rpc: NestedDict
     tx_hash: str
     is_proof_authority: bool = False
+    multicall_address: str = None
 
     def __post_init__(self):
         self.contract_address = Web3.to_checksum_address(self.contract_address)
+        if self.multicall_address:
+            self.multicall_address = Web3.to_checksum_address(self.multicall_address)

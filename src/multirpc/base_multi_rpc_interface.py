@@ -290,6 +290,7 @@ class BaseMultiRpc(ABC):
             tx = await self._build_transaction(contract, func_name, func_args, func_kwargs, tx_params)
             account: LocalAccount = Account.from_key(signer_private_key)
             if enable_estimate_gas_limit:
+                del tx['gas']
                 estimate_gas = await provider.eth.estimate_gas(tx)
                 logging.info(f"gas_estimation({estimate_gas} gas needed) is successful")
                 return account.sign_transaction({**tx, 'gas': int(estimate_gas * EstimateGasLimitBuffer)})

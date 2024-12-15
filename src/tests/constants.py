@@ -66,6 +66,22 @@ BaseConfig = ChainConfigTest(
     is_proof_authority=True
 )
 
+# Mantle Configuration
+MantleConfig = ChainConfigTest(
+    'Mantle',
+    '0x535D41D93cDc0818Ad8Eeb452B74e502A5742874',
+    NestedDict({
+        "view": {
+            1: ['https://1rpc.io/mantle', 'https://mantle.drpc.org'],
+        },
+        "transaction": {
+            1: ['https://1rpc.io/mantle', 'https://mantle.drpc.org'],
+        }
+    }),
+    '0x9f33a56be9983753abebbe8fb048601a141097289d96b9844afb36e68f72ef82',
+    is_proof_authority=False,
+)
+
 
 with open("tests/abi.json", "r") as f:
     abi = json.load(f)

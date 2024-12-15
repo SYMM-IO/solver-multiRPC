@@ -3,13 +3,12 @@ import logging
 import random
 
 from eth_account import Account
-from web3 import Web3
 
 from src.multirpc.async_multi_rpc_interface import AsyncMultiRpc
 from src.multirpc.constants import GasEstimationMethod, ViewPolicy
 from src.multirpc.sync_multi_rpc_interface import MultiRpc
-from src.multirpc.utils import ChainConfigTest, NestedDict
-from src.tests.constants import ArbConfig, BaseConfig, FtmConfig, PolyConfig, abi
+from src.multirpc.utils import ChainConfigTest
+from src.tests.constants import ArbConfig, BaseConfig, FtmConfig, MantleConfig, PolyConfig, abi
 from src.tests.test_settings import LogLevel, PrivateKey1, PrivateKey2
 
 PreviousBlock = 3
@@ -34,7 +33,8 @@ async def async_test_map(mr: AsyncMultiRpc, addr: str = None, pk: str = None):
 async def async_main(chain_config: ChainConfigTest):
     multi_rpc = AsyncMultiRpc(chain_config.rpc, chain_config.contract_address, view_policy=ViewPolicy.MostUpdated,
                               contract_abi=abi, gas_estimation=None, log_level=LogLevel,
-                              is_proof_authority=config_.is_proof_authority)
+                              is_proof_authority=config_.is_proof_authority,
+                              multicall_custom_address=chain_config.multicall_address, enable_estimate_gas_limit=True)
     multi_rpc.set_account(address1, private_key=PrivateKey1)
 
     p_block = await multi_rpc.get_block_number() - PreviousBlock
@@ -51,8 +51,6 @@ async def async_main(chain_config: ChainConfigTest):
     await async_test_map(multi_rpc, address1)
     await async_test_map(multi_rpc, address2, PrivateKey2)
 
-    print("async test was successful")
-
 
 def sync_test_map(mr: MultiRpc, addr: str = None, pk: str = None):
     random_hex = hex(random.randint(0x10, 0xff))
@@ -68,7 +66,8 @@ def sync_test_map(mr: MultiRpc, addr: str = None, pk: str = None):
 def sync_main(chain_config: ChainConfigTest):
     multi_rpc = MultiRpc(chain_config.rpc, chain_config.contract_address, contract_abi=abi, gas_estimation=None,
                          enable_estimate_gas_limit=True, log_level=LogLevel,
-                         is_proof_authority=config_.is_proof_authority)
+                         is_proof_authority=config_.is_proof_authority,
+                         multicall_custom_address=chain_config.multicall_address)
     multi_rpc.set_account(address1, private_key=PrivateKey1)
 
     p_block = multi_rpc.get_block_number() - PreviousBlock
@@ -85,17 +84,17 @@ def sync_main(chain_config: ChainConfigTest):
     sync_test_map(multi_rpc, address1)
     sync_test_map(multi_rpc, address2, PrivateKey2)
 
-    print("sync test was successful")
-
 
 async def test(chain_config: ChainConfigTest):
     try:
         sync_main(chain_config)
+        print("###sync test was successful###")
     except Exception as e:
         logging.error(e)
 
     try:
         await async_main(chain_config)
+        print('###async test was successful###')
     except Exception as e:
         logging.error(e)
 
@@ -107,7 +106,8 @@ if __name__ == '__main__':
         FtmConfig,
         ArbConfig,
         PolyConfig,
-        BaseConfig
+        BaseConfig,
+        MantleConfig
     ]:
         print(f"=============================== Start Testing on {config_.name} ===============================")
         asyncio.run(test(config_))

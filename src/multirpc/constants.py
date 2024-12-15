@@ -18,7 +18,7 @@ class GasEstimationMethod(enum.Enum):
 GasLimit = 1_000_000
 GasUpperBound = 50_000
 
-GasMultiplierLow = 1.0
+GasMultiplierLow = 1.1
 GasMultiplierMedium = 1.3
 GasMultiplierHigh = 1.5
 
@@ -29,7 +29,8 @@ MaxRPCInEachBracket = 3
 EstimateGasLimitBuffer = 1.1
 ChainIdToGas = {
     97: 10.1,   # Test BNB Network
-    250: 20,    # ftm
+    250: 20,    # Ftm
+    5000: 0.02  # Mantle
 }
 GasFromRpcChainIds = []  # for this chain ids use rpc to estimate gas
 FixedValueGas = 30
