@@ -4,7 +4,7 @@ import time
 from abc import ABC
 from concurrent.futures import ThreadPoolExecutor
 from time import sleep
-from typing import List, Union, Tuple, Coroutine, Dict, Optional, TypeVar, Callable
+from typing import Callable, Coroutine, Dict, List, Optional, Tuple, TypeVar, Union
 
 import web3
 from eth_account import Account
@@ -12,23 +12,20 @@ from eth_account.datastructures import SignedTransaction
 from eth_account.signers.local import LocalAccount
 from eth_typing import Address, ChecksumAddress
 from multicallable.async_multicallable import AsyncCall, AsyncMulticall
-from requests import ConnectionError, ReadTimeout, HTTPError
-from web3 import Web3, AsyncWeb3
+from requests import ConnectionError, HTTPError, ReadTimeout
+from web3 import AsyncWeb3, Web3
 from web3._utils.contracts import encode_transaction_data  # noqa
 from web3.contract import Contract
-from web3.exceptions import TimeExhausted, TransactionNotFound, BlockNotFound, BadResponseFormat
+from web3.exceptions import BadResponseFormat, BlockNotFound, TimeExhausted, TransactionNotFound
 from web3.types import BlockData, BlockIdentifier, TxReceipt
 
-from .constants import ViewPolicy
-from .exceptions import (
-    FailedOnAllRPCs,
-    TransactionFailedStatus,
-    Web3InterfaceException, TransactionValueError, GetBlockFailed, DontHaveThisRpcType, NotValidViewPolicy,
-)
+from .constants import EstimateGasLimitBuffer, GasLimit, GasUpperBound, ViewPolicy
+from .exceptions import (DontHaveThisRpcType, FailedOnAllRPCs, GetBlockFailed, NotValidViewPolicy,
+                         TransactionFailedStatus, TransactionValueError, Web3InterfaceException)
 from .gas_estimation import GasEstimation, GasEstimationMethod
 from .tx_trace import TxTrace
-from .utils import TxPriority, get_span_proper_label_from_provider, get_unix_time, NestedDict, create_web3_from_rpc, \
-    calculate_chain_id, reduce_list_of_list, ResultEvent
+from .utils import NestedDict, ResultEvent, TxPriority, calculate_chain_id, create_web3_from_rpc, \
+    get_span_proper_label_from_provider, get_unix_time, reduce_list_of_list
 
 T = TypeVar("T")
 
@@ -45,13 +42,27 @@ class BaseMultiRpc(ABC):
             contract_abi: Dict,
             view_policy: ViewPolicy = ViewPolicy.MostUpdated,
             gas_estimation: Optional[GasEstimation] = None,
-            gas_limit: int = 1_000_000,
-            gas_upper_bound: int = 26_000,
+            gas_limit: int = GasLimit,
+            gas_upper_bound: int = GasUpperBound,
             apm=None,
-            enable_gas_estimation: bool = False,
+            enable_estimate_gas_limit: bool = False,
             is_proof_authority: bool = False,
             log_level: logging = logging.WARN
     ):
+        """
+        Args:
+            gas_estimation: gas_estimation is module we use to estimate gas price for current chain
+            gas_limit: The gas limit is the maximum amount of gas units that a user is willing to spend on a transaction
+                - It limits the total computational work or "effort" that the network will
+                put into processing a transaction
+                - for same contracts on different chains gas limit can be different
+            gas_upper_bound: is upper bound for gasPrice.
+                - gasPrice: determines the total cost a user will pay for each unit of gas
+                - max_tx_fee = gas_limit * gas_price
+            enable_estimate_gas_limit: use web3.estimate_gas() before real tx
+                - for checking if tx can be executed successfully without paying tx fee
+                - also this(estimate_gas) function return gas limit that it will be used for tx.
+        """
         self.rpc_urls = rpc_urls
 
         self.gas_estimation = gas_estimation
@@ -68,12 +79,13 @@ class BaseMultiRpc(ABC):
         self.view_policy = view_policy
         self.gas_limit = gas_limit
         self.gas_upper_bound = gas_upper_bound
-        self.enable_gas_estimation = enable_gas_estimation
+        self.enable_estimate_gas_limit = enable_estimate_gas_limit
+        self.is_proof_authority = is_proof_authority
+        self.max_gas_limit = None
         self.providers = None
         self.address = None
         self.private_key = None
         self.chain_id = None
-        self.is_proof_authority = is_proof_authority
 
         logging.basicConfig(level=log_level)
 
@@ -215,8 +227,7 @@ class BaseMultiRpc(ABC):
                 calls = [[AsyncCall(cont, func_name, arg) for arg in args[0]] for cont in contracts]
             else:
                 calls = [[AsyncCall(cont, func_name, args, kwargs)] for cont in contracts]
-            execution_list = [mc.call(call, block_identifier=block_identifier) for mc, call in
-                              zip(multi_calls, calls)]
+            execution_list = [mc.call(call, block_identifier=block_identifier) for mc, call in zip(multi_calls, calls)]
             try:
                 return await self.__gather_tasks(execution_list, max_block_finder, view_policy=self.view_policy)
             except (Web3InterfaceException, asyncio.TimeoutError) as e:
@@ -242,13 +253,15 @@ class BaseMultiRpc(ABC):
         raise Web3InterfaceException(f"All of RPCs raise exception. {last_error=}")
 
     async def _get_tx_params(
-            self, nonce: int, address: str, gas_limit: int, gas_upper_bound: int, priority:
-            TxPriority, gas_estimation_method: GasEstimationMethod) -> Dict:
+            self, nonce: int, address: str, gas_limit: int, gas_upper_bound: int, priority: TxPriority,
+            gas_estimation_method: GasEstimationMethod) -> Dict:
         gas_params = await self.gas_estimation.get_gas_price(gas_upper_bound, priority, gas_estimation_method)
+
+        # max transaction fee = gas_limit * gas_price
         tx_params = {
             "from": address,
             "nonce": nonce,
-            "gas": gas_limit or self.gas_limit,
+            "gas": gas_limit or self.gas_limit,  # gas is gas_limit
             "chainId": self.chain_id,
         }
         tx_params.update(gas_params)
@@ -271,14 +284,16 @@ class BaseMultiRpc(ABC):
             func_kwargs: Dict,
             signer_private_key: str,
             tx_params: Dict,
-            enable_gas_estimation: bool
+            enable_estimate_gas_limit: bool
     ) -> SignedTransaction:
         try:
             tx = await self._build_transaction(contract, func_name, func_args, func_kwargs, tx_params)
             account: LocalAccount = Account.from_key(signer_private_key)
-            if enable_gas_estimation:
+            if enable_estimate_gas_limit:
+                del tx['gas']
                 estimate_gas = await provider.eth.estimate_gas(tx)
                 logging.info(f"gas_estimation({estimate_gas} gas needed) is successful")
+                return account.sign_transaction({**tx, 'gas': int(estimate_gas * EstimateGasLimitBuffer)})
             return account.sign_transaction(tx)
         except Exception as e:
             logging.error("exception in build and sign transaction: %s, %s", e.__class__.__name__, str(e))
@@ -346,7 +361,7 @@ class BaseMultiRpc(ABC):
             try:
                 self._logger_params(received_provider=rpc_url)
                 if (tx_receipt := await provider.eth.wait_for_transaction_receipt(tx, timeout=timeout)).status != 1:
-                    trace = TxTrace(Web3.to_hex(tx))
+                    trace = TxTrace(Web3.to_hex(tx), rpc_url)
                     self._handle_tx_trace(trace, func_name, func_args, func_kwargs)
                     raise TransactionFailedStatus(Web3.to_hex(tx), func_name, func_args, func_kwargs, trace)
                 return provider, tx_receipt
@@ -453,10 +468,11 @@ class BaseMultiRpc(ABC):
             providers: List[AsyncWeb3],
             contracts: List[Contract],
             tx_params: Dict,
-            enable_gas_estimation: bool,
+            enable_estimate_gas_limit: bool,
     ) -> Union[str, TxReceipt]:
         signed_transaction = await self._build_and_sign_transaction(
-            contracts[0], providers[0], func_name, func_args, func_kwargs, private_key, tx_params, enable_gas_estimation
+            contracts[0], providers[0], func_name, func_args, func_kwargs, private_key, tx_params,
+            enable_estimate_gas_limit
         )
         tx_hash = Web3.to_hex(signed_transaction.hash)
         self._logger_params(tx_hash=tx_hash)
@@ -490,19 +506,19 @@ class BaseMultiRpc(ABC):
 
     async def _call_tx_function(self, address: str, gas_limit: int, gas_upper_bound: int, priority: TxPriority,
                                 gas_estimation_method: GasEstimationMethod,
-                                enable_gas_estimation: Optional[bool] = None, **kwargs):
+                                enable_estimate_gas_limit: Optional[bool] = None, **kwargs):
         nonce = await self._get_nonce(address)
         tx_params = await self._get_tx_params(
             nonce, address, gas_limit, gas_upper_bound, priority, gas_estimation_method
         )
         last_error = None
-        enable_gas_estimation = self.enable_gas_estimation if enable_gas_estimation is None else enable_gas_estimation
+        enable_estimate_gas_limit = self.enable_estimate_gas_limit if enable_estimate_gas_limit is None else enable_estimate_gas_limit
         for p, c in zip(
                 self.providers['transaction'].values(), self.contracts['transaction'].values()
         ):  # type: List[AsyncWeb3], List[Contract]
             try:
                 return await self.__call_tx(**kwargs, providers=p, contracts=c, tx_params=tx_params,
-                                            enable_gas_estimation=enable_gas_estimation)
+                                            enable_estimate_gas_limit=enable_estimate_gas_limit)
             except (TransactionFailedStatus, TransactionValueError):
                 raise
             except (ConnectionError, ReadTimeout, TimeExhausted, TransactionNotFound, FailedOnAllRPCs) as e:
@@ -536,7 +552,8 @@ class BaseMultiRpc(ABC):
                 raise
         raise last_exception
 
-    async def get_block(self, block_identifier: BlockIdentifier, full_transactions: bool = False) -> BlockData:
+    async def get_block(self, block_identifier: BlockIdentifier = 'latest',
+                        full_transactions: bool = False) -> BlockData:
         self.check_for_view()
 
         exceptions = (HTTPError, ConnectionError, ReadTimeout, ValueError, TimeExhausted, BlockNotFound)

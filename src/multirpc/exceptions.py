@@ -68,3 +68,6 @@ class TransactionTypeNotSupportedInMultiCall(Web3InterfaceException):
 class KwargsNotSupportedInMultiCall(Web3InterfaceException):
     pass
 
+
+class FailedToGetGasFromApi(Web3InterfaceException):
+    pass

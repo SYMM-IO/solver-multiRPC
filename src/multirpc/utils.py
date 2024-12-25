@@ -4,6 +4,7 @@ import json
 import logging
 import time
 import traceback
+from dataclasses import dataclass
 from functools import reduce, wraps
 from threading import Thread
 from typing import Dict, List, Tuple, Union
@@ -188,3 +189,18 @@ async def calculate_chain_id(providers: NestedDict) -> int:
 
 def reduce_list_of_list(ls: List[List]) -> List[any]:
     return reduce(lambda ps, p: ps + p, ls)
+
+
+@dataclass
+class ChainConfigTest:
+    name: str
+    contract_address: str
+    rpc: NestedDict
+    tx_hash: str
+    is_proof_authority: bool = False
+    multicall_address: str = None
+
+    def __post_init__(self):
+        self.contract_address = Web3.to_checksum_address(self.contract_address)
+        if self.multicall_address:
+            self.multicall_address = Web3.to_checksum_address(self.multicall_address)

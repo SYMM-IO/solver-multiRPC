@@ -1,14 +1,17 @@
 import asyncio
+import logging
 import random
 
 from eth_account import Account
-from web3 import Web3
 
 from src.multirpc.async_multi_rpc_interface import AsyncMultiRpc
-from src.multirpc.constants import ViewPolicy, GasEstimationMethod
+from src.multirpc.constants import GasEstimationMethod, ViewPolicy
 from src.multirpc.sync_multi_rpc_interface import MultiRpc
-from src.tests.constants import ContractAddr, RPCs, abi
-from src.tests.test_settings import PrivateKey1, PrivateKey2, LogLevel
+from src.multirpc.utils import ChainConfigTest
+from src.tests.constants import ArbConfig, BaseConfig, FtmConfig, MantleConfig, PolyConfig, abi
+from src.tests.test_settings import LogLevel, PrivateKey1, PrivateKey2
+
+PreviousBlock = 3
 
 
 async def async_test_map(mr: AsyncMultiRpc, addr: str = None, pk: str = None):
@@ -27,26 +30,26 @@ async def async_test_map(mr: AsyncMultiRpc, addr: str = None, pk: str = None):
     assert random_hex == result_hex, "test was not successful"
 
 
-async def async_main():
-    multi_rpc = AsyncMultiRpc(RPCs, contract_addr, view_policy=ViewPolicy.FirstSuccess, contract_abi=abi,
-                              gas_estimation=None, enable_gas_estimation=True, log_level=LogLevel)
+async def async_main(chain_config: ChainConfigTest):
+    multi_rpc = AsyncMultiRpc(chain_config.rpc, chain_config.contract_address, view_policy=ViewPolicy.MostUpdated,
+                              contract_abi=abi, gas_estimation=None, log_level=LogLevel,
+                              is_proof_authority=config_.is_proof_authority,
+                              multicall_custom_address=chain_config.multicall_address, enable_estimate_gas_limit=True)
     multi_rpc.set_account(address1, private_key=PrivateKey1)
 
-    p_block = await multi_rpc.get_block_number() - 25
-    print(f"tx_receipt: {await multi_rpc.get_tx_receipt(tx_hash)}")
-    print(f"block: {await multi_rpc.get_block(block)}")
+    p_block = await multi_rpc.get_block_number() - PreviousBlock
+    print(f"tx_receipt: {await multi_rpc.get_tx_receipt(chain_config.tx_hash)}")
+    print(f"block: {await multi_rpc.get_block(p_block - 1000)}")
     print(f"Nonce: {await multi_rpc.get_nonce(address1)}")
     print(f"map({address1}): 0x{bytes(await multi_rpc.functions.map(address1).call()).hex()}")
 
-    results = await multi_rpc.functions.map([(address1,), (address2,)]).multicall()
+    results = await multi_rpc.functions.map([(address1,), (address2,)] * 100).multicall()
     print(f"map({address1, address2}): {[f'0x{bytes(res).hex()}' for res in results]}")
     print(f"map({address1}) in {p_block=}: "
           f"0x{bytes(await multi_rpc.functions.map(address1).call(block_identifier=p_block)).hex()}")
 
     await async_test_map(multi_rpc, address1)
     await async_test_map(multi_rpc, address2, PrivateKey2)
-
-    print("async test was successful")
 
 
 def sync_test_map(mr: MultiRpc, addr: str = None, pk: str = None):
@@ -60,14 +63,16 @@ def sync_test_map(mr: MultiRpc, addr: str = None, pk: str = None):
     assert random_hex == result_hex, "test was not successful"
 
 
-def sync_main():
-    multi_rpc = MultiRpc(RPCs, contract_addr, contract_abi=abi, gas_estimation=None, enable_gas_estimation=True,
-                         log_level=LogLevel)
+def sync_main(chain_config: ChainConfigTest):
+    multi_rpc = MultiRpc(chain_config.rpc, chain_config.contract_address, contract_abi=abi, gas_estimation=None,
+                         enable_estimate_gas_limit=True, log_level=LogLevel,
+                         is_proof_authority=config_.is_proof_authority,
+                         multicall_custom_address=chain_config.multicall_address)
     multi_rpc.set_account(address1, private_key=PrivateKey1)
 
-    p_block = multi_rpc.get_block_number() - 25
-    print(f"tx_receipt: {multi_rpc.get_tx_receipt(tx_hash)}")
-    print(f"block: {multi_rpc.get_block(block)}")
+    p_block = multi_rpc.get_block_number() - PreviousBlock
+    print(f"tx_receipt: {multi_rpc.get_tx_receipt(chain_config.tx_hash)}")
+    print(f"block: {multi_rpc.get_block(p_block - 1000)}")
     print(f"Nonce: {multi_rpc.get_nonce(address1)}")
     print(f"map({address1}): 0x{bytes(multi_rpc.functions.map(address1).call()).hex()}")
 
@@ -79,19 +84,31 @@ def sync_main():
     sync_test_map(multi_rpc, address1)
     sync_test_map(multi_rpc, address2, PrivateKey2)
 
-    print("sync test was successful")
 
+async def test(chain_config: ChainConfigTest):
+    try:
+        sync_main(chain_config)
+        print("###sync test was successful###")
+    except Exception as e:
+        logging.error(e)
 
-async def test():
-    sync_main()
-    await async_main()
+    try:
+        await async_main(chain_config)
+        print('###async test was successful###')
+    except Exception as e:
+        logging.error(e)
 
 
 if __name__ == '__main__':
     address1 = Account.from_key(PrivateKey1).address
     address2 = Account.from_key(PrivateKey2).address
-    contract_addr = Web3.to_checksum_address(ContractAddr)
-    tx_hash = '0x7bb81aba6b2ea3145034c676e89d4eb0bc2cdc423a95b8b32d50100fe18d90e5'
-    block = 69_354_608
-
-    asyncio.run(test())
+    for config_ in [
+        FtmConfig,
+        ArbConfig,
+        PolyConfig,
+        BaseConfig,
+        MantleConfig
+    ]:
+        print(f"=============================== Start Testing on {config_.name} ===============================")
+        asyncio.run(test(config_))
+        print(f"=============================== Test on {config_.name} Completed ===============================\n\n")
