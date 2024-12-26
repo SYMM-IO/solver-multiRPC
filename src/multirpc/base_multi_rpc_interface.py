@@ -322,7 +322,7 @@ class BaseMultiRpc(ABC):
                 logging.exception("_send_transaction_exception")
                 raise TransactionValueError
             raise
-        except (ConnectionError, ReadTimeout, HTTPError) as e:  # FIXME complete list
+        except (ConnectionError, ReadTimeout, HTTPError) as e:
             logging.debug(f"network exception in send transaction: {e.__class__.__name__}, {str(e)}")
             raise
         except Exception as e:
@@ -489,7 +489,7 @@ class BaseMultiRpc(ABC):
 
         logging.info(f"success tx: {provider= }, {tx= }")
         rpc_url = provider.provider.endpoint_uri
-        self._logger_params(sent_provider=rpc_url)
+        self._logger_params(sent_provider=rpc_url, tx_send_time=int(time.time())*1000)
 
         if not wait_for_receipt:
             return tx_hash
