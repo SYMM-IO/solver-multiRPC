@@ -6,9 +6,10 @@ from eth_account import Account
 
 from src.multirpc.async_multi_rpc_interface import AsyncMultiRpc
 from src.multirpc.constants import GasEstimationMethod, ViewPolicy
+from src.multirpc.exceptions import TransactionFailedStatus
 from src.multirpc.sync_multi_rpc_interface import MultiRpc
 from src.multirpc.utils import ChainConfigTest
-from src.tests.constants import ArbConfig, BaseConfig, FtmConfig, MantleConfig, PolyConfig, abi
+from src.tests.constants import ArbConfig, BaseConfig, MantleConfig, PolyConfig, RPCsSupportingTxTrace, abi
 from src.tests.test_settings import LogLevel, PrivateKey1, PrivateKey2
 
 PreviousBlock = 3
@@ -21,6 +22,13 @@ async def async_test_map(mr: AsyncMultiRpc, addr: str = None, pk: str = None):
                                             gas_estimation_method=GasEstimationMethod.GAS_API_PROVIDER)
     await mr.functions.set(random_hex).call(address=addr, private_key=pk,
                                             gas_estimation_method=GasEstimationMethod.FIXED)
+
+    # for failure purpose
+    try:
+        await mr.functions.set(random_hex, random_hex).call(address=addr, private_key=pk,
+                                                            gas_estimation_method=GasEstimationMethod.RPC)
+    except TransactionFailedStatus:
+        pass
     tx_receipt = await mr.functions.set(random_hex).call(address=addr, private_key=pk,
                                                          gas_estimation_method=GasEstimationMethod.RPC)
     print(f"{tx_receipt=}")
@@ -31,7 +39,9 @@ async def async_test_map(mr: AsyncMultiRpc, addr: str = None, pk: str = None):
 
 
 async def async_main(chain_config: ChainConfigTest):
-    multi_rpc = AsyncMultiRpc(chain_config.rpc, chain_config.contract_address, view_policy=ViewPolicy.MostUpdated,
+    multi_rpc = AsyncMultiRpc(chain_config.rpc, chain_config.contract_address,
+                              rpcs_supporting_tx_trace=RPCsSupportingTxTrace,
+                              view_policy=ViewPolicy.MostUpdated,
                               contract_abi=abi, gas_estimation=None, log_level=LogLevel,
                               is_proof_authority=config_.is_proof_authority,
                               multicall_custom_address=chain_config.multicall_address, enable_estimate_gas_limit=True)
@@ -64,7 +74,9 @@ def sync_test_map(mr: MultiRpc, addr: str = None, pk: str = None):
 
 
 def sync_main(chain_config: ChainConfigTest):
-    multi_rpc = MultiRpc(chain_config.rpc, chain_config.contract_address, contract_abi=abi, gas_estimation=None,
+    multi_rpc = MultiRpc(chain_config.rpc, chain_config.contract_address, contract_abi=abi,
+                         rpcs_supporting_tx_trace=RPCsSupportingTxTrace,
+                         gas_estimation=None,
                          enable_estimate_gas_limit=True, log_level=LogLevel,
                          is_proof_authority=config_.is_proof_authority,
                          multicall_custom_address=chain_config.multicall_address)
@@ -103,7 +115,7 @@ if __name__ == '__main__':
     address1 = Account.from_key(PrivateKey1).address
     address2 = Account.from_key(PrivateKey2).address
     for config_ in [
-        FtmConfig,
+        # FtmConfig,
         ArbConfig,
         PolyConfig,
         BaseConfig,

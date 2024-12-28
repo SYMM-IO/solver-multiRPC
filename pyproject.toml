@@ -4,7 +4,7 @@ requires = [
     "setuptools>=42",
     "wheel"
 ]
-version = "3.0.8"
+version = "3.0.9"
 dependencies = [
     "web3<7.0.0",
     "multicallable>=6.0.0",

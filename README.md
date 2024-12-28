@@ -94,6 +94,8 @@ multi_rpc = MultiRpc(rpcs, contract_address='YOUR_CONTRACT_ADDRESS', contract_ab
 ```
 - `enable_estimate_gas_limit=True` will check if tx can be done successfully without paying fee, 
 and also calculate gas limit for tx
+- You can pass a list of RPCs to `rpcs_supporting_tx_trace=[]` to identify which of the provided RPCs (`rpcs`) support `tx_trace`. 
+Then, when a transaction fails, you can retrieve the trace of the transaction.
 
 ### Setting Account
 

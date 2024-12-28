@@ -40,6 +40,7 @@ class BaseMultiRpc(ABC):
             rpc_urls: NestedDict,
             contract_address: Union[Address, ChecksumAddress, str],
             contract_abi: Dict,
+            rpcs_supporting_tx_trace: Optional[List[str]] = None,
             view_policy: ViewPolicy = ViewPolicy.MostUpdated,
             gas_estimation: Optional[GasEstimation] = None,
             gas_limit: int = GasLimit,
@@ -69,6 +70,7 @@ class BaseMultiRpc(ABC):
 
         self.contract_address = Web3.to_checksum_address(contract_address)
         self.contract_abi = contract_abi
+        self.rpcs_supporting_tx_trace = [] if rpcs_supporting_tx_trace is None else rpcs_supporting_tx_trace
         self.apm = apm
 
         self.contracts: NestedDict = NestedDict({'transaction': None, 'view': None})
@@ -317,7 +319,9 @@ class BaseMultiRpc(ABC):
                     'transaction underpriced' in str(e).lower() or
                     'account suspended' in str(e).lower() or
                     'exceeds the configured cap' in str(e).lower() or
-                    'no backends available for method' in str(e).lower()
+                    'no backends available for method' in str(e).lower() or
+                    'future transaction tries to replace pending' in str(e).lower() or
+                    'over rate limit' in str(e).lower()
             ):
                 logging.exception("_send_transaction_exception")
                 raise TransactionValueError
@@ -332,17 +336,18 @@ class BaseMultiRpc(ABC):
                 self.apm.capture_exception()
             raise
 
-    def _handle_tx_trace(self, trace: TxTrace, func_name: str, func_args: Tuple, func_kwargs: Dict):
+    @staticmethod
+    def _handle_tx_trace(trace: TxTrace, func_name: str, func_args: Tuple, func_kwargs: Dict):
         """
         You can override this method to customize handling failed transaction.
 
         example:
             if "out of gas" in trace.text():
-                raise InsufficientGasBalance(f'out of gas in {func_name}')
+                return InsufficientGasBalance(f'out of gas in {func_name}')
             if "PartyBFacet: Will be liquidatable" in trace.text():
-                raise PartyBWillBeLiquidatable(f'partyB will be liquidatable in {func_name}')
+                return PartyBWillBeLiquidatable(f'partyB will be liquidatable in {func_name}')
             if "LibMuon: TSS not verified" in trace.text():
-                raise TssNotVerified(Web3.to_hex(tx), func_name, func_args, func_kwargs, trace)
+                return TssNotVerified(Web3.to_hex(tx), func_name, func_args, func_kwargs, trace)
             if trace.ok():
                 logging.error(f'TraceTransaction({func_name}): {trace.result().long_error()}')
                 apm.capture_message(param_message={
@@ -353,17 +358,13 @@ class BaseMultiRpc(ABC):
 
         pass
 
-    async def _wait_and_get_tx_receipt(self, provider: AsyncWeb3, tx, timeout: float, func_name: str,
-                                       func_args: Tuple, func_kwargs: Dict) -> Tuple[AsyncWeb3, TxReceipt]:
+    async def _wait_and_get_tx_receipt(self, provider: AsyncWeb3, tx, timeout: float) -> Tuple[AsyncWeb3, TxReceipt]:
         con_err_count = tx_err_count = 0
         rpc_url = provider.provider.endpoint_uri
         while True:
             try:
                 self._logger_params(received_provider=rpc_url)
-                if (tx_receipt := await provider.eth.wait_for_transaction_receipt(tx, timeout=timeout)).status != 1:
-                    trace = TxTrace(Web3.to_hex(tx), rpc_url)
-                    self._handle_tx_trace(trace, func_name, func_args, func_kwargs)
-                    raise TransactionFailedStatus(Web3.to_hex(tx), func_name, func_args, func_kwargs, trace)
+                tx_receipt = await provider.eth.wait_for_transaction_receipt(tx, timeout=timeout)
                 return provider, tx_receipt
             except ConnectionError:
                 if con_err_count >= 5:
@@ -375,6 +376,12 @@ class BaseMultiRpc(ABC):
                     raise
                 tx_err_count += 1
                 timeout *= 2
+
+    @staticmethod
+    async def __get_tx_trace(tx, provider_url, func_name=None, func_args=None, func_kwargs=None):
+        trace = TxTrace(Web3.to_hex(tx), provider_url)
+        BaseMultiRpc._handle_tx_trace(trace, func_name, func_args, func_kwargs)
+        return TransactionFailedStatus(tx, func_name, func_args, func_kwargs, trace)
 
     @staticmethod
     async def __execute_batch_tasks(
@@ -494,15 +501,28 @@ class BaseMultiRpc(ABC):
         if not wait_for_receipt:
             return tx_hash
         execution_receipt_list = [
-            self._wait_and_get_tx_receipt(p, tx, wait_for_receipt, func_name, func_args, func_kwargs) for p in providers
+            self._wait_and_get_tx_receipt(p, tx, wait_for_receipt) for p in providers
         ]
         provider, tx_receipt = await self.__execute_batch_tasks(
             execution_receipt_list,
             [TimeExhausted, TransactionNotFound, ConnectionError, ReadTimeout,
              ValueError, BadResponseFormat, HTTPError],
         )
+        if tx_receipt.status == 1:
+            return tx_receipt
 
-        return tx_receipt
+        # get tx_trace In case transaction failed
+        execution_trace_list = [
+            self.__get_tx_trace(tx, p.provider.endpoint_uri, func_name, func_args, func_kwargs) for p in providers
+            if p.provider.endpoint_uri in self.rpcs_supporting_tx_trace
+        ]
+        if not execution_trace_list:
+            raise TransactionFailedStatus(tx_hash, func_name, func_args, func_kwargs)
+
+        raise await self.__execute_batch_tasks(
+            execution_trace_list,
+            [HTTPError, ConnectionError, ReadTimeout, ValueError, BadResponseFormat],
+        )
 
     async def _call_tx_function(self, address: str, gas_limit: int, gas_upper_bound: int, priority: TxPriority,
                                 gas_estimation_method: GasEstimationMethod,
@@ -512,7 +532,9 @@ class BaseMultiRpc(ABC):
             nonce, address, gas_limit, gas_upper_bound, priority, gas_estimation_method
         )
         last_error = None
-        enable_estimate_gas_limit = self.enable_estimate_gas_limit if enable_estimate_gas_limit is None else enable_estimate_gas_limit
+        enable_estimate_gas_limit = self.enable_estimate_gas_limit if enable_estimate_gas_limit is None \
+            else enable_estimate_gas_limit
+
         for p, c in zip(
                 self.providers['transaction'].values(), self.contracts['transaction'].values()
         ):  # type: List[AsyncWeb3], List[Contract]

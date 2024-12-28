@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='solver-multiRPC',
-    version='3.0.8',
+    version='3.0.9',
     author='rorschach',
     author_email='rorschach45001@gmail.com',
     packages=find_packages('src'),

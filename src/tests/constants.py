@@ -82,6 +82,12 @@ MantleConfig = ChainConfigTest(
     is_proof_authority=False,
 )
 
+RPCsSupportingTxTrace = [
+    'https://1rpc.io/arb', 'https://arb1.arbitrum.io/rpc',  # Arbitrum
+    'https://1rpc.io/matic', 'https://polygon-rpc.com',     # Polygon
+    'https://1rpc.io/base', 'https://mainnet.base.org',     # Base
+    'https://1rpc.io/mantle', 'https://mantle.drpc.org'     # Mantle
+]
 
 with open("tests/abi.json", "r") as f:
     abi = json.load(f)

@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Dict, Optional, Union
+from typing import Dict, List, Optional, Union
 
 from eth_typing import Address, ChecksumAddress
 from web3._utils.contracts import encode_transaction_data  # noqa
@@ -25,6 +25,7 @@ class AsyncMultiRpc(BaseMultiRpc):
             rpc_urls: NestedDict,
             contract_address: Union[Address, ChecksumAddress, str],
             contract_abi: Dict,
+            rpcs_supporting_tx_trace: Optional[List[str]] = None,
             view_policy: ViewPolicy = ViewPolicy.MostUpdated,
             gas_estimation: Optional[GasEstimation] = None,
             gas_limit: int = GasLimit,
@@ -35,7 +36,7 @@ class AsyncMultiRpc(BaseMultiRpc):
             multicall_custom_address: str = None,
             log_level: logging = logging.WARN
     ):
-        super().__init__(rpc_urls, contract_address, contract_abi,
+        super().__init__(rpc_urls, contract_address, contract_abi, rpcs_supporting_tx_trace,
                          view_policy, gas_estimation, gas_limit,
                          gas_upper_bound, apm, enable_estimate_gas_limit,
                          is_proof_authority, log_level)
