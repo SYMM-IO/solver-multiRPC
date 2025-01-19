@@ -385,7 +385,7 @@ class BaseMultiRpc(ABC):
 
     @staticmethod
     async def __execute_batch_tasks(
-            execution_list: List[Coroutine[None, None, T]],
+            execution_list: List[Coroutine],
             ignored_exceptions: Optional[List[type[BaseException]]] = None,
             final_exception: Optional[type[BaseException]] = None
     ) -> T:
@@ -417,11 +417,11 @@ class BaseMultiRpc(ABC):
 
         """
 
-        async def exec_task(task: Coroutine, cancel_event: ResultEvent, lock: asyncio.Lock):
+        async def exec_task(task: Coroutine, cancel_event_: ResultEvent, lock_: asyncio.Lock):
             res = await task
-            async with lock:
-                cancel_event.set_result(res)
-            cancel_event.set()
+            async with lock_:
+                cancel_event_.set_result(res)
+            cancel_event_.set()
 
         cancel_event = ResultEvent()
         lock = asyncio.Lock()
@@ -496,7 +496,7 @@ class BaseMultiRpc(ABC):
 
         logging.info(f"success tx: {provider= }, {tx= }")
         rpc_url = provider.provider.endpoint_uri
-        self._logger_params(sent_provider=rpc_url, tx_send_time=int(time.time())*1000)
+        self._logger_params(sent_provider=rpc_url, tx_send_time=int(time.time()) * 1000)
 
         if not wait_for_receipt:
             return tx_hash

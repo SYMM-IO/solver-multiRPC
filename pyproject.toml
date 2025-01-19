@@ -6,7 +6,7 @@ requires = [
 ]
 version = "3.0.9"
 dependencies = [
-    "web3<7.0.0",
+    "web3>7.0.0",
     "multicallable>=6.0.0",
     "eth-account>=0.13.0",
 ]

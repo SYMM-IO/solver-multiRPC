@@ -25,10 +25,10 @@ ArbConfig = ChainConfigTest(
     '0xF1fe944285c9DF10C839Fa4E901D9b71f71eD5D0',
     NestedDict({
         "view": {
-            1: ['https://1rpc.io/arb', 'https://arb1.arbitrum.io/rpc'],
+            1: ['https://1rpc.io/arb', 'https://rpc.ankr.com/arbitrum'],
         },
         "transaction": {
-            1: ['https://1rpc.io/arb', 'https://arb1.arbitrum.io/rpc'],
+            1: ['https://1rpc.io/arb', 'https://rpc.ankr.com/arbitrum'],
         }
     }),
     '0xbc0f34536fdf5d2593081b112d49d714993d879032e0e9c6998afc3110b7f0ed'

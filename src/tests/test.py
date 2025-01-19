@@ -3,6 +3,7 @@ import logging
 import random
 
 from eth_account import Account
+from web3.exceptions import MismatchedABI, Web3ValidationError
 
 from src.multirpc.async_multi_rpc_interface import AsyncMultiRpc
 from src.multirpc.constants import GasEstimationMethod, ViewPolicy
@@ -27,7 +28,7 @@ async def async_test_map(mr: AsyncMultiRpc, addr: str = None, pk: str = None):
     try:
         await mr.functions.set(random_hex, random_hex).call(address=addr, private_key=pk,
                                                             gas_estimation_method=GasEstimationMethod.RPC)
-    except TransactionFailedStatus:
+    except (Web3ValidationError, TransactionFailedStatus, MismatchedABI):
         pass
     tx_receipt = await mr.functions.set(random_hex).call(address=addr, private_key=pk,
                                                          gas_estimation_method=GasEstimationMethod.RPC)

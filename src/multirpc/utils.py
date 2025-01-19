@@ -7,15 +7,18 @@ import traceback
 from dataclasses import dataclass
 from functools import reduce, wraps
 from threading import Thread
-from typing import Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import aiohttp.client_exceptions
-import web3
-from web3 import Web3, AsyncWeb3
-from web3.middleware import async_geth_poa_middleware
+from aiohttp import ClientTimeout
+from eth_typing import URI
+from web3 import AsyncHTTPProvider, AsyncWeb3, Web3, WebSocketProvider
+from web3._utils.http import DEFAULT_HTTP_TIMEOUT
+from web3._utils.http_session_manager import HTTPSessionManager
+from web3.middleware import ExtraDataToPOAMiddleware
 
 from .constants import MaxRPCInEachBracket
-from .exceptions import MaximumRPCInEachBracketReached, AtLastProvideOneValidRPCInEachBracket
+from .exceptions import AtLastProvideOneValidRPCInEachBracket, MaximumRPCInEachBracketReached
 
 
 def get_span_proper_label_from_provider(endpoint_uri):
@@ -138,15 +141,67 @@ class NestedDict:
         return json.dumps(self.data, indent=1)
 
 
+class CustomHTTPSessionManager(HTTPSessionManager):
+    """
+     This class extends the default HTTPSessionManager used by Web3 to ensure that
+     the aiohttp ClientSession is always closed—even in the case of a failure or
+     cancellation. By placing session closure inside a 'finally' block in both
+     'async_make_post_request' and 'async_json_make_get_request', we guarantee
+     proper cleanup of network connections and resources, preventing potential
+     resource leaks or connection pooling issues if an exception is raised during
+     the request or the task is cancelled.
+     """
+
+    async def async_make_post_request(
+            self, endpoint_uri: URI, data: Union[bytes, Dict[str, Any]], **kwargs: Any
+    ) -> bytes:
+        kwargs.setdefault("timeout", ClientTimeout(DEFAULT_HTTP_TIMEOUT))
+        session = await self.async_cache_and_return_session(
+            endpoint_uri, request_timeout=kwargs["timeout"]
+        )
+
+        try:
+            self.logger.debug(f'making post request, {endpoint_uri=}, {kwargs=}')
+            response = await session.post(endpoint_uri, **dict(**kwargs, data=data))
+            response.raise_for_status()
+            return await response.read()
+        finally:
+            self.logger.debug(f'task is done/canceled, session will close, {session=}')
+            if not session.closed:
+                await session.close()
+
+    async def async_json_make_get_request(
+            self, endpoint_uri: URI, *args: Any, **kwargs: Any
+    ) -> Dict[str, Any]:
+        kwargs.setdefault("timeout", ClientTimeout(DEFAULT_HTTP_TIMEOUT))
+        session = await self.async_cache_and_return_session(
+            endpoint_uri, request_timeout=kwargs["timeout"]
+        )
+        try:
+            response = await session.get(endpoint_uri, *args, **kwargs)
+            response.raise_for_status()
+            return await response.json()
+        finally:
+            self.logger.debug(f'task is done/canceled, {session=}')
+            if not session.closed:
+                await session.close()
+
+
+class CustomAsyncHTTPProvider(AsyncHTTPProvider):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._request_session_manager = CustomHTTPSessionManager()
+
+
 async def create_web3_from_rpc(rpc_urls: NestedDict, is_proof_of_authority: bool) -> NestedDict:
-    async def create_web3(rpc: str):
+    async def create_web3(rpc_: str):
         async_w3: AsyncWeb3
-        if rpc.startswith("http"):
-            async_w3 = web3.AsyncWeb3(Web3.AsyncHTTPProvider(rpc))
+        if rpc_.startswith("http"):
+            async_w3 = AsyncWeb3(CustomAsyncHTTPProvider(rpc_))
         else:
-            async_w3 = web3.AsyncWeb3(Web3.WebsocketProvider(rpc))
+            async_w3 = AsyncWeb3(WebSocketProvider(rpc_))
         if is_proof_of_authority:
-            async_w3.middleware_onion.inject(async_geth_poa_middleware, layer=0)
+            async_w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
         try:
             status = await async_w3.is_connected()
         except (asyncio.exceptions.TimeoutError, aiohttp.client_exceptions.ClientResponseError):
