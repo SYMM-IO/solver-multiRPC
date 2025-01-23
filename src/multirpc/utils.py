@@ -141,7 +141,7 @@ class NestedDict:
         return json.dumps(self.data, indent=1)
 
 
-class CustomHTTPSessionManager(HTTPSessionManager):
+class MultiRpcHTTPSessionManager(HTTPSessionManager):
     """
      This class extends the default HTTPSessionManager used by Web3 to ensure that
      the aiohttp ClientSession is always closed—even in the case of a failure or
@@ -150,6 +150,8 @@ class CustomHTTPSessionManager(HTTPSessionManager):
      proper cleanup of network connections and resources, preventing potential
      resource leaks or connection pooling issues if an exception is raised during
      the request or the task is cancelled.
+
+     NOTE: It's based on web3==7.7.0 . If you update web3 check if it's compatible.
      """
 
     async def async_make_post_request(
@@ -187,17 +189,21 @@ class CustomHTTPSessionManager(HTTPSessionManager):
                 await session.close()
 
 
-class CustomAsyncHTTPProvider(AsyncHTTPProvider):
+class MultiRpcAsyncHTTPProvider(AsyncHTTPProvider):
+    """
+    NOTE: It's based on web3==7.7.0 . If you update web3 check if it's compatible.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._request_session_manager = CustomHTTPSessionManager()
+        self._request_session_manager = MultiRpcHTTPSessionManager()
 
 
 async def create_web3_from_rpc(rpc_urls: NestedDict, is_proof_of_authority: bool) -> NestedDict:
     async def create_web3(rpc_: str):
         async_w3: AsyncWeb3
         if rpc_.startswith("http"):
-            async_w3 = AsyncWeb3(CustomAsyncHTTPProvider(rpc_))
+            async_w3 = AsyncWeb3(MultiRpcAsyncHTTPProvider(rpc_))
         else:
             async_w3 = AsyncWeb3(WebSocketProvider(rpc_))
         if is_proof_of_authority:
