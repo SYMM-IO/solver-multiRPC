@@ -627,8 +627,9 @@ class BaseContractFunction:
         self.kwargs = None
 
     def get_encoded_data(self):
+        reduce_list_of_list(self.mr.providers['transaction'].values())
         return encode_transaction_data(
-            self.mr.providers[0],
+            reduce_list_of_list(self.mr.providers['transaction'].values())[0],
             self.name,
             self.mr.contract_abi,
             self.abi,

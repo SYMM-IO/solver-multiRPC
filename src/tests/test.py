@@ -30,8 +30,11 @@ async def async_test_map(mr: AsyncMultiRpc, addr: str = None, pk: str = None):
                                                             gas_estimation_method=GasEstimationMethod.RPC)
     except (Web3ValidationError, TransactionFailedStatus, MismatchedABI):
         pass
+
+    print(f'encoded function: {mr.functions.set(random_hex).get_encoded_data()}')
     tx_receipt = await mr.functions.set(random_hex).call(address=addr, private_key=pk,
                                                          gas_estimation_method=GasEstimationMethod.RPC)
+
     print(f"{tx_receipt=}")
     result: bytes = await mr.functions.map(addr).call()
     result_hex = "0x" + result.hex()
@@ -66,6 +69,7 @@ async def async_main(chain_config: ChainConfigTest):
 def sync_test_map(mr: MultiRpc, addr: str = None, pk: str = None):
     random_hex = hex(random.randint(0x10, 0xff))
     print(f"Random hex: {random_hex}")
+    print(f'encoded function: {mr.functions.set(random_hex).get_encoded_data()}')
     mr.functions.set(random_hex).call(address=addr, private_key=pk)
 
     result: bytes = mr.functions.map(addr).call()
