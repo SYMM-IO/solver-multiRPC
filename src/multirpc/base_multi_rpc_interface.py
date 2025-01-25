@@ -347,7 +347,7 @@ class BaseMultiRpc(ABC):
             if "PartyBFacet: Will be liquidatable" in trace.text():
                 return PartyBWillBeLiquidatable(f'partyB will be liquidatable in {func_name}')
             if "LibMuon: TSS not verified" in trace.text():
-                return TssNotVerified(Web3.to_hex(tx), func_name, func_args, func_kwargs, trace)
+                return TssNotVerified(trace.tx_hash, func_name, func_args, func_kwargs, trace)
             if trace.ok():
                 logging.error(f'TraceTransaction({func_name}): {trace.result().long_error()}')
                 apm.capture_message(param_message={
