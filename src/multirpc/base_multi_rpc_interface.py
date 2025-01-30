@@ -48,6 +48,7 @@ class BaseMultiRpc(ABC):
             apm=None,
             enable_estimate_gas_limit: bool = False,
             is_proof_authority: bool = False,
+            multicall_custom_address: str = None,
             log_level: logging = logging.WARN
     ):
         """
@@ -83,6 +84,7 @@ class BaseMultiRpc(ABC):
         self.gas_upper_bound = gas_upper_bound
         self.enable_estimate_gas_limit = enable_estimate_gas_limit
         self.is_proof_authority = is_proof_authority
+        self.multicall_custom_address = multicall_custom_address
         self.max_gas_limit = None
         self.providers = None
         self.address = None
@@ -108,7 +110,7 @@ class BaseMultiRpc(ABC):
         self.address = Web3.to_checksum_address(address)
         self.private_key = private_key
 
-    async def setup(self, multicall_custom_address: str = None) -> None:
+    async def setup(self) -> None:
         self.providers = await create_web3_from_rpc(self.rpc_urls, self.is_proof_authority)
         self.chain_id = await calculate_chain_id(self.providers)
 
@@ -127,7 +129,7 @@ class BaseMultiRpc(ABC):
                 rpc_url = wb3.provider.endpoint_uri
                 try:
                     mc = AsyncMulticall()
-                    await mc.setup(w3=wb3, custom_address=multicall_custom_address)
+                    await mc.setup(w3=wb3, custom_address=self.multicall_custom_address)
                     multi_calls.append(mc)
                     contracts.append(
                         wb3.eth.contract(self.contract_address, abi=self.contract_abi)

@@ -34,12 +34,13 @@ class AsyncMultiRpc(BaseMultiRpc):
             enable_estimate_gas_limit: bool = False,
             is_proof_authority: bool = False,
             multicall_custom_address: str = None,
-            log_level: logging = logging.WARN
+            log_level: logging = logging.WARN,
+            setup_on_init: bool = True
     ):
         super().__init__(rpc_urls, contract_address, contract_abi, rpcs_supporting_tx_trace,
                          view_policy, gas_estimation, gas_limit,
                          gas_upper_bound, apm, enable_estimate_gas_limit,
-                         is_proof_authority, log_level)
+                         is_proof_authority, multicall_custom_address, log_level)
 
         for func_abi in self.contract_abi:
             if func_abi.get("stateMutability") in ("view", "pure"):
@@ -52,7 +53,8 @@ class AsyncMultiRpc(BaseMultiRpc):
                 func_abi["name"],
                 self.ContractFunction(func_abi["name"], func_abi, self, function_type),
             )
-        asyncio.run(self.setup(multicall_custom_address=multicall_custom_address))
+        if setup_on_init:
+            asyncio.run(self.setup())
 
     async def get_nonce(self, address: Union[Address, ChecksumAddress, str]) -> int:
         return await super()._get_nonce(address)
