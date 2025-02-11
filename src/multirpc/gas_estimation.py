@@ -9,7 +9,8 @@ from requests import ConnectionError, JSONDecodeError, ReadTimeout, RequestExcep
 from web3 import AsyncWeb3, Web3
 from web3.types import Wei
 
-from .constants import ChainIdToGas, DEFAULT_API_PROVIDER, DevEnv, FixedValueGas, GasEstimationMethod, \
+from .constants import ChainIdToGas, DEFAULT_API_PROVIDER, DevEnv, FixedValueGas, GasEstimationLogger, \
+    GasEstimationMethod, \
     GasFromRpcChainIds, GasMultiplierHigh, GasMultiplierLow, GasMultiplierMedium, RequestTimeout
 from .exceptions import FailedToGetGasFromApi, FailedToGetGasPrice, OutOfRangeTransactionFee
 from .utils import TxPriority
@@ -51,13 +52,13 @@ class GasEstimation:
             GasEstimationMethod.FIXED,
             GasEstimationMethod.CUSTOM
         ]
-        logging.basicConfig(level=log_level)
+        GasEstimationLogger.setLevel(log_level)
 
     def __logger_params(self, **kwargs):
         if self.apm:
             self.apm.span_label(**kwargs)
         else:
-            logging.info(f'params={kwargs}')
+            GasEstimationLogger.info(f'params={kwargs}')
 
     async def _get_gas_from_api(self, priority: TxPriority, gas_upper_bound: Union[float, Decimal]) -> Dict[str, Wei]:
         gas_provider = self.gas_api_provider.format(chain_id=self.chain_id)
@@ -87,7 +88,7 @@ class GasEstimation:
             return gas_params
         except (RequestException, JSONDecodeError, KeyError) as e:
             if not DevEnv:
-                logging.exception(f'Failed to get gas info from api({self.chain_id=}) {resp.status_code=}')
+                GasEstimationLogger.exception(f'Failed to get gas info from api({self.chain_id=}) {resp.status_code=}')
             raise FailedToGetGasPrice(f"Failed to get gas info from api({self.chain_id=}): {e}")
 
     async def _get_gas_from_rpc(self, priority: TxPriority, gas_upper_bound: Union[float, Decimal]) -> Dict[str, Wei]:
@@ -103,10 +104,10 @@ class GasEstimation:
                     found_gas_below_upper_bound = True
                     break
             except (ConnectionError, ReadTimeout, ValueError, ConnectionResetError) as e:
-                logging.error(f"Failed to get gas price from {rpc_url}, {e=}")
+                GasEstimationLogger.error(f"Failed to get gas price from {rpc_url}, {e=}")
             except ClientResponseError as e:
                 if e.message.startswith("Too Many Requests"):
-                    logging.error(f"Failed to get gas price from {rpc_url}, {e=}")
+                    GasEstimationLogger.error(f"Failed to get gas price from {rpc_url}, {e=}")
                 raise
 
         if gas_price is None:
@@ -143,7 +144,7 @@ class GasEstimation:
                 gas_params = await self.gas_estimation_method[method_key](priority, gas_upper_bound)
                 break
             except (FailedToGetGasPrice, OutOfRangeTransactionFee) as e:
-                logging.warning(f"This method({method_key}) failed to provide gas with this error: {e}")
+                GasEstimationLogger.warning(f"This method({method_key}) failed to provide gas with this error: {e}")
                 continue
         if not gas_params:
             raise FailedToGetGasPrice("All of methods failed to estimate gas")

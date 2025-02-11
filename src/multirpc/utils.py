@@ -1,7 +1,6 @@
 import asyncio
 import enum
 import json
-import logging
 import time
 import traceback
 from dataclasses import dataclass
@@ -17,7 +16,7 @@ from web3._utils.http import DEFAULT_HTTP_TIMEOUT
 from web3._utils.http_session_manager import HTTPSessionManager
 from web3.middleware import ExtraDataToPOAMiddleware
 
-from .constants import MaxRPCInEachBracket
+from .constants import MaxRPCInEachBracket, MultiRPCLogger
 from .exceptions import AtLastProvideOneValidRPCInEachBracket, MaximumRPCInEachBracketReached
 
 
@@ -223,7 +222,7 @@ async def create_web3_from_rpc(rpc_urls: NestedDict, is_proof_of_authority: bool
         for i, rpc in enumerate(rpcs):
             w3, w3_connected = await create_web3(rpc)
             if not w3_connected:
-                logging.warning(f"This rpc({rpc}) doesn't work")
+                MultiRPCLogger.warning(f"This rpc({rpc}) doesn't work")
                 continue
             valid_rpcs.append(w3)
 
@@ -243,7 +242,7 @@ async def calculate_chain_id(providers: NestedDict) -> int:
                 return await asyncio.wait_for(provider.eth.chain_id, timeout=2)
             except asyncio.TimeoutError as e:
                 last_error = e
-                logging.warning(f"Can't acquire chain id from this RPC {provider.provider.endpoint_uri}")
+                MultiRPCLogger.warning(f"Can't acquire chain id from this RPC {provider.provider.endpoint_uri}")
     raise last_error
 
 

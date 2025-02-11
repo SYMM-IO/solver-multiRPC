@@ -19,7 +19,7 @@ from web3.contract import Contract
 from web3.exceptions import BadResponseFormat, BlockNotFound, TimeExhausted, TransactionNotFound
 from web3.types import BlockData, BlockIdentifier, TxReceipt
 
-from .constants import EstimateGasLimitBuffer, GasLimit, GasUpperBound, ViewPolicy
+from .constants import EstimateGasLimitBuffer, GasLimit, GasUpperBound, MultiRPCLogger, ViewPolicy
 from .exceptions import (DontHaveThisRpcType, FailedOnAllRPCs, GetBlockFailed, NotValidViewPolicy,
                          TransactionFailedStatus, TransactionValueError, Web3InterfaceException)
 from .gas_estimation import GasEstimation, GasEstimationMethod
@@ -91,13 +91,13 @@ class BaseMultiRpc(ABC):
         self.private_key = None
         self.chain_id = None
 
-        logging.basicConfig(level=log_level)
+        MultiRPCLogger.setLevel(log_level)
 
     def _logger_params(self, **kwargs) -> None:
         if self.apm:
             self.apm.span_label(**kwargs)
         else:
-            logging.info(f'params={kwargs}')
+            MultiRPCLogger.info(f'params={kwargs}')
 
     def set_account(self, address: Union[ChecksumAddress, str], private_key: str) -> None:
         """
@@ -136,7 +136,7 @@ class BaseMultiRpc(ABC):
                     )
                 except (ConnectionError, ReadTimeout, asyncio.TimeoutError) as e:
                     # fixme: at least we should retry not ignoring rpc
-                    logging.warning(f"Ignore rpc {rpc_url} because of {e}")
+                    MultiRPCLogger.warning(f"Ignore rpc {rpc_url} because of {e}")
                 if len(multi_calls) != 0 and len(contracts) != 0:
                     is_rpc_provided = True
 
@@ -182,7 +182,7 @@ class BaseMultiRpc(ABC):
 
             if len(results) == 0:
                 for exc in exceptions:
-                    logging.exception(f"RAISED EXCEPTION: {exc}")
+                    MultiRPCLogger.exception(f"RAISED EXCEPTION: {exc}")
                 raise FailedOnAllRPCs(f"All of RPCs raise exception. first exception: {exceptions[0]}")
             return result_selector(results)
         elif view_policy == view_policy.FirstSuccess:  # wait to at least 1 task completed
@@ -236,7 +236,7 @@ class BaseMultiRpc(ABC):
                 return await self.__gather_tasks(execution_list, max_block_finder, view_policy=self.view_policy)
             except (Web3InterfaceException, asyncio.TimeoutError) as e:
                 last_error = e
-                logging.warning(f"Can't call view function from this list of rpc({rpc_bracket}), error: {e}")
+                MultiRPCLogger.warning(f"Can't call view function from this list of rpc({rpc_bracket}), error: {e}")
         raise Web3InterfaceException(f"All of RPCs raise exception. {last_error=}")
 
     async def _get_nonce(self, address: Union[Address, ChecksumAddress, str],
@@ -252,7 +252,7 @@ class BaseMultiRpc(ABC):
                 return await self.__gather_tasks(execution_list, max)
             except (Web3InterfaceException, asyncio.TimeoutError) as e:
                 last_error = e
-                logging.warning(f"get_nounce: {e}")
+                MultiRPCLogger.warning(f"get_nounce: {e}")
                 pass
         raise Web3InterfaceException(f"All of RPCs raise exception. {last_error=}")
 
@@ -296,11 +296,11 @@ class BaseMultiRpc(ABC):
             if enable_estimate_gas_limit:
                 del tx['gas']
                 estimate_gas = await provider.eth.estimate_gas(tx)
-                logging.info(f"gas_estimation({estimate_gas} gas needed) is successful")
+                MultiRPCLogger.info(f"gas_estimation({estimate_gas} gas needed) is successful")
                 return account.sign_transaction({**tx, 'gas': int(estimate_gas * EstimateGasLimitBuffer)})
             return account.sign_transaction(tx)
         except Exception as e:
-            logging.error("exception in build and sign transaction: %s, %s", e.__class__.__name__, str(e))
+            MultiRPCLogger.error("exception in build and sign transaction: %s, %s", e.__class__.__name__, str(e))
             raise
 
     async def _send_transaction(self, provider: web3.AsyncWeb3, raw_transaction: any) -> Tuple[AsyncWeb3, any]:
@@ -312,7 +312,7 @@ class BaseMultiRpc(ABC):
             self._logger_params(tx_send_time=int(time.time() * 1000))
             return provider, transaction
         except ValueError as e:
-            logging.error(f"RPC({rpc_url}) value error: {str(e)}")
+            MultiRPCLogger.error(f"RPC({rpc_url}) value error: {str(e)}")
             t_bnb_flag = "transaction would cause overdraft" in str(e).lower() and (await provider.eth.chain_id) == 97
             if not (
                     t_bnb_flag or
@@ -325,15 +325,15 @@ class BaseMultiRpc(ABC):
                     'future transaction tries to replace pending' in str(e).lower() or
                     'over rate limit' in str(e).lower()
             ):
-                logging.exception("_send_transaction_exception")
+                MultiRPCLogger.exception("_send_transaction_exception")
                 raise TransactionValueError
             raise
         except (ConnectionError, ReadTimeout, HTTPError) as e:
-            logging.debug(f"network exception in send transaction: {e.__class__.__name__}, {str(e)}")
+            MultiRPCLogger.debug(f"network exception in send transaction: {e.__class__.__name__}, {str(e)}")
             raise
         except Exception as e:
             # FIXME needs better exception handling
-            logging.error(f"exception in send transaction: {e.__class__.__name__}, {str(e)}")
+            MultiRPCLogger.error(f"exception in send transaction: {e.__class__.__name__}, {str(e)}")
             if self.apm:
                 self.apm.capture_exception()
             raise
@@ -351,7 +351,7 @@ class BaseMultiRpc(ABC):
             if "LibMuon: TSS not verified" in trace.text():
                 return TssNotVerified(trace.tx_hash, func_name, func_args, func_kwargs, trace)
             if trace.ok():
-                logging.error(f'TraceTransaction({func_name}): {trace.result().long_error()}')
+                MultiRPCLogger.error(f'TraceTransaction({func_name}): {trace.result().long_error()}')
                 apm.capture_message(param_message={
                     'message': f'tr failed ({func_name}, {trace.result().first_usable_error()}): %s',
                     'params': (trace.text(),),
@@ -497,7 +497,7 @@ class BaseMultiRpc(ABC):
         )
         provider, tx = result
 
-        logging.info(f"success tx: {provider= }, {tx= }")
+        MultiRPCLogger.info(f"success tx: {provider= }, {tx= }")
         rpc_url = provider.provider.endpoint_uri
         self._logger_params(sent_provider=rpc_url, tx_send_time=int(time.time()) * 1000)
 

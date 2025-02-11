@@ -1,6 +1,6 @@
-import logging
-
 import requests
+
+from src.multirpc.constants import MultiRPCLogger
 
 
 class TxTrace:
@@ -66,13 +66,13 @@ class TxTrace:
             response = requests.post(self.rpc, json=data)
             if response.status_code == 200:
                 if error := response.json().get('error'):
-                    logging.error(f'failed to get tx({self.tx_hash}) trace with error: {error}')
+                    MultiRPCLogger.error(f'failed to get tx({self.tx_hash}) trace with error: {error}')
                     return None
                 return response
-            logging.error(f'tx_trace({self.tx_hash}) status = {response.status_code}, \n {response.json()}')
+            MultiRPCLogger.error(f'tx_trace({self.tx_hash}) status = {response.status_code}, \n {response.json()}')
 
         except requests.HTTPError:
-            logging.exception('Exception in debug_traceTransaction')
+            MultiRPCLogger.exception('Exception in debug_traceTransaction')
 
     def ok(self):
         return bool(self.response)

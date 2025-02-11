@@ -1,4 +1,5 @@
 import enum
+import logging
 
 DEFAULT_API_PROVIDER = 'https://gas-api.metaswap.codefi.network/networks/{chain_id}/suggestedGasFees'
 
@@ -34,6 +35,18 @@ ChainIdToGas = {
 }
 GasFromRpcChainIds = []  # for this chain ids use rpc to estimate gas
 FixedValueGas = 30
+
+MultiRPCLoggerName = 'Multi-RPC'
+GasEstimationLoggerName = MultiRPCLoggerName + '.Gas-Estimation'
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+
+MultiRPCLogger = logging.getLogger(MultiRPCLoggerName)
+GasEstimationLogger = logging.getLogger(GasEstimationLoggerName)
+
+MultiRPCLogger.addHandler(console_handler)
+GasEstimationLogger.addHandler(console_handler)
 
 RequestTimeout = 30
 DevEnv = True

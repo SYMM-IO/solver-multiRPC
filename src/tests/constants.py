@@ -66,10 +66,10 @@ MantleConfig = ChainConfigTest(
 )
 
 RPCsSupportingTxTrace = [
-    'https://arbitrum.drpc.org',    # Arbitrum
-    'https://polygon-rpc.com',      # Polygon
-    'https://base.drpc.org',        # Base
-    'https://mantle.drpc.org'       # Mantle
+    'https://arbitrum.drpc.org',  # Arbitrum
+    'https://polygon-rpc.com',  # Polygon
+    'https://base.drpc.org',  # Base
+    'https://mantle.drpc.org'  # Mantle
 ]
 
 with open("tests/abi.json", "r") as f:
