@@ -1,3 +1,4 @@
 web3>7.0.0
 multicallable>=6.0.0
 eth-account>=0.13.0
+poetry
