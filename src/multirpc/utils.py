@@ -51,13 +51,12 @@ class ReturnableThread(Thread):
 def thread_safe(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        try:
-            asyncio.get_running_loop()
-            t = ReturnableThread(target=func, args=args, kwargs=kwargs)
-            t.start()
-            return t.join()
-        except RuntimeError:
+        event_loop = asyncio._get_running_loop()
+        if event_loop is None:
             return func(*args, **kwargs)
+        t = ReturnableThread(target=func, args=args, kwargs=kwargs)
+        t.start()
+        return t.join()
 
     return wrapper
 

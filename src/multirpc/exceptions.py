@@ -1,3 +1,5 @@
+from src.multirpc.tx_trace import TxTrace
+
 BaseException_ = Exception
 
 
@@ -24,13 +26,15 @@ class TransactionFailedStatus(Web3InterfaceException):
         self.func_name = func_name
         self.func_args = func_args
         self.func_kwargs = func_kwargs
-        self.trace = trace
+        self.trace: TxTrace = trace
 
     def __str__(self):
-        return f'{self.__class__.__name__}({self.hex_tx_hash} func={self.func_name})'
+        return (f'{self.__class__.__name__}({self.hex_tx_hash} func={self.func_name}, '
+                f'{self.func_name=}, {self.func_kwargs=}, {self.trace=})')
 
     def __repr__(self):
-        return f'{self.__class__.__name__}({self.hex_tx_hash} func={self.func_name})'
+        return (f'{self.__class__.__name__}({self.hex_tx_hash} func={self.func_name}, '
+                f'{self.func_name=}, {self.func_kwargs=}, {self.trace=})')
 
 
 class FailedToGetGasPrice(Web3InterfaceException):

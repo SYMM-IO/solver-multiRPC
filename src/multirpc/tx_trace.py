@@ -48,6 +48,9 @@ class TxTrace:
     def __repr__(self):
         return f'{self.tx_hash}-{self.response and self.response.text}'
 
+    def __str__(self):
+        return f'{self.tx_hash}-{self.response and self.response.text}'
+
     def tx_trace(self):
         try:
             data = {

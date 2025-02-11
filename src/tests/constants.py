@@ -2,33 +2,16 @@ import json
 
 from src.multirpc.utils import ChainConfigTest, NestedDict
 
-# Fantom Configuration
-FtmConfig = ChainConfigTest(
-    'Fantom',
-    '0x20f40F64771c3a5aa0A5166d1261984E08Ca027B',
-    NestedDict({
-        "view": {
-            1: ['https://1rpc.io/ftm', 'https://fantom.publicnode.com'],
-            2: ['https://fantom-pokt.nodies.app'],
-        },
-        "transaction": {
-            1: ['https://1rpc.io/ftm', 'https://fantom.publicnode.com'],
-            2: ['https://fantom-pokt.nodies.app'],
-        }
-    }),
-    '0x7bb81aba6b2ea3145034c676e89d4eb0bc2cdc423a95b8b32d50100fe18d90e5'
-)
-
 # Arbitrum Configuration
 ArbConfig = ChainConfigTest(
     'Arbitrum',
-    '0xF1fe944285c9DF10C839Fa4E901D9b71f71eD5D0',
+    '0xCFE3c06Fe982A7D16ce3826C64c5f0730054Dc95',
     NestedDict({
         "view": {
-            1: ['https://1rpc.io/arb', 'https://rpc.ankr.com/arbitrum'],
+            1: ['https://1rpc.io/arb', 'https://rpc.ankr.com/arbitrum', 'https://arbitrum.drpc.org'],
         },
         "transaction": {
-            1: ['https://1rpc.io/arb', 'https://rpc.ankr.com/arbitrum'],
+            1: ['https://1rpc.io/arb', 'https://rpc.ankr.com/arbitrum', 'https://arbitrum.drpc.org'],
         }
     }),
     '0xbc0f34536fdf5d2593081b112d49d714993d879032e0e9c6998afc3110b7f0ed'
@@ -37,7 +20,7 @@ ArbConfig = ChainConfigTest(
 # Polygon Configuration
 PolyConfig = ChainConfigTest(
     'Polygon',
-    '0x6a8e0D6b591801bD699d32B0B0AC061ca9Ac8d0A',
+    '0xCa7DFDc4dB0F27484Cf5EEa1CdF380301Ef07Ce2',
     NestedDict({
         "view": {
             1: ['https://1rpc.io/matic', 'https://polygon-rpc.com'],
@@ -53,13 +36,13 @@ PolyConfig = ChainConfigTest(
 # Base Configuration
 BaseConfig = ChainConfigTest(
     'Base',
-    '0xE9a0bc5A0A2d82c1bD525970c3D08C91616A70A8',
+    '0x1d58e7F58d085c87E34b18DAe5A6D08d187cbcbe',
     NestedDict({
         "view": {
-            1: ['https://1rpc.io/base', 'https://base-rpc.publicnode.com', 'https://base.drpc.org'],
+            1: ['https://base-rpc.publicnode.com', 'https://base.drpc.org'],
         },
         "transaction": {
-            1: ['https://1rpc.io/base', 'https://base-rpc.publicnode.com', 'https://base.drpc.org'],
+            1: ['https://base-rpc.publicnode.com', 'https://base.drpc.org'],
         }
     }),
     '0xbd342d36d503af057cd79fd4f252b4629d6013d0748a2742dc99c9fcbe522072',
@@ -83,10 +66,10 @@ MantleConfig = ChainConfigTest(
 )
 
 RPCsSupportingTxTrace = [
-    'https://1rpc.io/arb', 'https://arb1.arbitrum.io/rpc',  # Arbitrum
-    'https://1rpc.io/matic', 'https://polygon-rpc.com',     # Polygon
-    'https://1rpc.io/base', 'https://mainnet.base.org',     # Base
-    'https://1rpc.io/mantle', 'https://mantle.drpc.org'     # Mantle
+    'https://arbitrum.drpc.org',    # Arbitrum
+    'https://polygon-rpc.com',      # Polygon
+    'https://base.drpc.org',        # Base
+    'https://mantle.drpc.org'       # Mantle
 ]
 
 with open("tests/abi.json", "r") as f:

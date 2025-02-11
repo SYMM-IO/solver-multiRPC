@@ -10,7 +10,7 @@ import web3
 from eth_account import Account
 from eth_account.datastructures import SignedTransaction
 from eth_account.signers.local import LocalAccount
-from eth_typing import Address, ChecksumAddress
+from eth_typing import Address, ChecksumAddress, HexStr
 from multicallable.async_multicallable import AsyncCall, AsyncMulticall
 from requests import ConnectionError, HTTPError, ReadTimeout
 from web3 import AsyncWeb3, Web3
@@ -381,9 +381,10 @@ class BaseMultiRpc(ABC):
 
     @staticmethod
     async def __get_tx_trace(tx, provider_url, func_name=None, func_args=None, func_kwargs=None):
-        trace = TxTrace(Web3.to_hex(tx), provider_url)
+        tx_hash = Web3.to_hex(tx)
+        trace = TxTrace(tx_hash, provider_url)
         BaseMultiRpc._handle_tx_trace(trace, func_name, func_args, func_kwargs)
-        return TransactionFailedStatus(tx, func_name, func_args, func_kwargs, trace)
+        return TransactionFailedStatus(tx_hash, func_name, func_args, func_kwargs, trace)
 
     @staticmethod
     async def __execute_batch_tasks(
@@ -503,7 +504,7 @@ class BaseMultiRpc(ABC):
         if not wait_for_receipt:
             return tx_hash
         execution_receipt_list = [
-            self._wait_and_get_tx_receipt(p, tx, wait_for_receipt) for p in providers
+            self._wait_and_get_tx_receipt(p, tx_hash, wait_for_receipt) for p in providers
         ]
         provider, tx_receipt = await self.__execute_batch_tasks(
             execution_receipt_list,
@@ -523,7 +524,7 @@ class BaseMultiRpc(ABC):
 
         raise await self.__execute_batch_tasks(
             execution_trace_list,
-            [HTTPError, ConnectionError, ReadTimeout, ValueError, BadResponseFormat],
+            [HTTPError, ConnectionError, ReadTimeout, BadResponseFormat],
         )
 
     async def _call_tx_function(self, address: str, gas_limit: int, gas_upper_bound: int, priority: TxPriority,
@@ -628,8 +629,7 @@ class BaseContractFunction:
         self.args = None
         self.kwargs = None
 
-    def get_encoded_data(self):
-        reduce_list_of_list(self.mr.providers['transaction'].values())
+    def get_encoded_data(self) -> HexStr:
         return encode_transaction_data(
             reduce_list_of_list(self.mr.providers['transaction'].values())[0],
             self.name,
