@@ -5,12 +5,12 @@ import random
 from eth_account import Account
 from web3.exceptions import MismatchedABI
 
-from src.multirpc.async_multi_rpc_interface import AsyncMultiRpc
-from src.multirpc.constants import GasEstimationMethod, ViewPolicy
-from src.multirpc.sync_multi_rpc_interface import MultiRpc
-from src.multirpc.utils import ChainConfigTest
-from src.tests.constants import ArbConfig, BaseConfig, PolyConfig, RPCsSupportingTxTrace, abi
-from src.tests.test_settings import LogLevel, PrivateKey1, PrivateKey2
+from multirpc.async_multi_rpc_interface import AsyncMultiRpc
+from multirpc.constants import GasEstimationMethod, ViewPolicy
+from multirpc.sync_multi_rpc_interface import MultiRpc
+from multirpc.utils import ChainConfigTest
+from tests.constants import ArbConfig, BaseConfig, PolyConfig, RPCsSupportingTxTrace, abi
+from tests.test_settings import LogLevel, PrivateKey1, PrivateKey2
 
 PreviousBlock = 3
 
@@ -18,10 +18,10 @@ PreviousBlock = 3
 async def async_test_map(mr: AsyncMultiRpc, addr: str = None, pk: str = None):
     random_int = random.randint(10, 100)
     print(f"Random int: {random_int}")
-    # await mr.functions.set(random_int).call(address=addr, private_key=pk,
-    #                                         gas_estimation_method=GasEstimationMethod.GAS_API_PROVIDER)
-    # await mr.functions.set(random_int).call(address=addr, private_key=pk,
-    #                                         gas_estimation_method=GasEstimationMethod.FIXED)
+    await mr.functions.set(random_int).call(address=addr, private_key=pk,
+                                            gas_estimation_method=GasEstimationMethod.GAS_API_PROVIDER)
+    await mr.functions.set(random_int).call(address=addr, private_key=pk,
+                                            gas_estimation_method=GasEstimationMethod.FIXED)
 
     # for failure purpose
     try:
@@ -72,7 +72,7 @@ async def async_main(chain_config: ChainConfigTest):
           f"{await multi_rpc.functions.map(address1).call(block_identifier=p_block)}")
 
     await async_test_map(multi_rpc, address1)
-    # await async_test_map(multi_rpc, address2, PrivateKey2)
+    await async_test_map(multi_rpc, address2, PrivateKey2)
 
 
 def sync_test_map(mr: MultiRpc, addr: str = None, pk: str = None):
@@ -111,11 +111,11 @@ def sync_main(chain_config: ChainConfigTest):
 
 
 async def test(chain_config: ChainConfigTest):
-    # try:
-    #     sync_main(chain_config)
-    #     print("###sync test was successful###")
-    # except Exception as e:
-    #     logging.error(e)
+    try:
+        sync_main(chain_config)
+        print("###sync test was successful###")
+    except Exception as e:
+        logging.error(e)
 
     try:
         await async_main(chain_config)

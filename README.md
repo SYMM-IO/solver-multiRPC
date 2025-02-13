@@ -32,7 +32,7 @@ Below is an example of how to use the AsyncMultiRpc class for asynchronous opera
 ```python
 import asyncio
 import json
-from src.multirpc.utils import NestedDict
+from multirpc import NestedDict
 from multirpc import AsyncMultiRpc
 
 

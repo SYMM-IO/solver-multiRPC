@@ -1,6 +1,6 @@
 import requests
 
-from src.multirpc.constants import MultiRPCLogger
+from multirpc.constants import MultiRPCLogger
 
 
 class TxTrace:

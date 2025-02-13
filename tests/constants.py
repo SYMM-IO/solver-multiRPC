@@ -1,6 +1,6 @@
 import json
 
-from src.multirpc.utils import ChainConfigTest, NestedDict
+from multirpc.utils import ChainConfigTest, NestedDict
 
 # Arbitrum Configuration
 ArbConfig = ChainConfigTest(
@@ -72,7 +72,7 @@ RPCsSupportingTxTrace = [
     'https://mantle.drpc.org'  # Mantle
 ]
 
-with open("tests/abi.json", "r") as f:
+with open("abi.json", "r") as f:
     abi = json.load(f)
 
 PreviousBlock = 3

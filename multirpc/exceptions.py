@@ -1,4 +1,4 @@
-from src.multirpc.tx_trace import TxTrace
+from multirpc.tx_trace import TxTrace
 
 BaseException_ = Exception
 
