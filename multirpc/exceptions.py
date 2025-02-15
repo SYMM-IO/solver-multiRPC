@@ -29,12 +29,16 @@ class TransactionFailedStatus(Web3InterfaceException):
         self.trace: TxTrace = trace
 
     def __str__(self):
-        return (f'{self.__class__.__name__}({self.hex_tx_hash} func={self.func_name}, '
-                f'{self.func_name=}, {self.func_kwargs=}, {self.trace=})')
+        return self.__repr__()
 
     def __repr__(self):
-        return (f'{self.__class__.__name__}({self.hex_tx_hash} func={self.func_name}, '
-                f'{self.func_name=}, {self.func_kwargs=}, {self.trace=})')
+        ret = (f'{self.__class__.__name__}({self.hex_tx_hash}, {self.func_name=}, '
+                f'{self.func_args=}, {self.func_kwargs=})')
+        if self.trace and self.trace.ok():
+            main_error = self.trace.result().first_usable_error()
+            ret += f' {main_error=}'
+
+        return ret
 
 
 class FailedToGetGasPrice(Web3InterfaceException):
