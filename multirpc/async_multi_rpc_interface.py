@@ -6,7 +6,7 @@ from eth_typing import Address, ChecksumAddress
 from web3._utils.contracts import encode_transaction_data  # noqa
 from web3.types import BlockData, BlockIdentifier, TxReceipt
 
-from . import BaseMultiRpc
+from .base_multi_rpc_interface import BaseMultiRpc
 from .base_multi_rpc_interface import BaseContractFunction
 from .constants import GasLimit, GasUpperBound, ViewPolicy
 from .exceptions import DontHaveThisRpcType, KwargsNotSupportedInMultiCall, TransactionTypeNotSupportedInMultiCall

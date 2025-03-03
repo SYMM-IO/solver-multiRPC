@@ -33,7 +33,7 @@ Below is an example of how to use the AsyncMultiRpc class for asynchronous opera
 import asyncio
 import json
 from multirpc.utils import NestedDict
-from multirpc.async_multi_rpc_interface import AsyncMultiRpc
+from multirpc import AsyncMultiRpc
 
 
 async def main():
@@ -179,7 +179,6 @@ Here is an example:
 ```python
 from multirpc import GasEstimation, TxPriority, GasEstimationMethod
 from web3 import Web3
-from web3.types import Wei
 
 
 class CustomGasEstimation(GasEstimation):

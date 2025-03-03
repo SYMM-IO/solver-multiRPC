@@ -5,9 +5,8 @@ import random
 from eth_account import Account
 from web3.exceptions import MismatchedABI
 
-from multirpc.async_multi_rpc_interface import AsyncMultiRpc
+from multirpc import AsyncMultiRpc, MultiRpc
 from multirpc.constants import GasEstimationMethod, ViewPolicy
-from multirpc.sync_multi_rpc_interface import MultiRpc
 from multirpc.utils import ChainConfigTest
 from tests.constants import ArbConfig, BaseConfig, PolyConfig, RPCsSupportingTxTrace, abi
 from tests.test_settings import LogLevel, PrivateKey1, PrivateKey2
@@ -89,6 +88,7 @@ def sync_test_map(mr: MultiRpc, addr: str = None, pk: str = None):
 def sync_main(chain_config: ChainConfigTest):
     multi_rpc = MultiRpc(chain_config.rpc, chain_config.contract_address, contract_abi=abi,
                          rpcs_supporting_tx_trace=RPCsSupportingTxTrace,
+                         view_policy=ViewPolicy.FirstSuccess,
                          gas_estimation=None,
                          enable_estimate_gas_limit=True, log_level=LogLevel,
                          is_proof_authority=config_.is_proof_authority,
