@@ -55,7 +55,7 @@ async def async_main(chain_config: ChainConfigTest):
                               rpcs_supporting_tx_trace=RPCsSupportingTxTrace,
                               view_policy=ViewPolicy.MostUpdated,
                               contract_abi=abi, gas_estimation=None, log_level=LogLevel,
-                              is_proof_authority=config_.is_proof_authority,
+                              is_proof_authority=chain_config.is_proof_authority,
                               multicall_custom_address=chain_config.multicall_address, enable_estimate_gas_limit=True)
     multi_rpc.set_account(address1, private_key=PrivateKey1)
 
@@ -91,7 +91,7 @@ def sync_main(chain_config: ChainConfigTest):
                          view_policy=ViewPolicy.FirstSuccess,
                          gas_estimation=None,
                          enable_estimate_gas_limit=True, log_level=LogLevel,
-                         is_proof_authority=config_.is_proof_authority,
+                         is_proof_authority=chain_config.is_proof_authority,
                          multicall_custom_address=chain_config.multicall_address)
     multi_rpc.set_account(address1, private_key=PrivateKey1)
 
