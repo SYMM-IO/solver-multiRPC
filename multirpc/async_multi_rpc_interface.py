@@ -1,13 +1,12 @@
 import asyncio
 import logging
-from typing import Dict, List, Optional, Union
+from typing import List, Optional, Union
 
 from eth_typing import Address, ChecksumAddress
 from web3._utils.contracts import encode_transaction_data  # noqa
 from web3.types import BlockData, BlockIdentifier, TxReceipt
 
-from .base_multi_rpc_interface import BaseMultiRpc
-from .base_multi_rpc_interface import BaseContractFunction
+from .base_multi_rpc_interface import BaseContractFunction, BaseMultiRpc
 from .constants import GasLimit, GasUpperBound, ViewPolicy
 from .exceptions import DontHaveThisRpcType, KwargsNotSupportedInMultiCall, TransactionTypeNotSupportedInMultiCall
 from .gas_estimation import GasEstimation, GasEstimationMethod
@@ -24,7 +23,7 @@ class AsyncMultiRpc(BaseMultiRpc):
             self,
             rpc_urls: NestedDict,
             contract_address: Union[Address, ChecksumAddress, str],
-            contract_abi: Dict,
+            contract_abi: list,
             rpcs_supporting_tx_trace: Optional[List[str]] = None,
             view_policy: ViewPolicy = ViewPolicy.MostUpdated,
             gas_estimation: Optional[GasEstimation] = None,

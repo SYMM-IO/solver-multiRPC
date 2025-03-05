@@ -39,7 +39,7 @@ class BaseMultiRpc(ABC):
             self,
             rpc_urls: NestedDict,
             contract_address: Union[Address, ChecksumAddress, str],
-            contract_abi: Dict,
+            contract_abi: list,
             rpcs_supporting_tx_trace: Optional[List[str]] = None,
             view_policy: ViewPolicy = ViewPolicy.MostUpdated,
             gas_estimation: Optional[GasEstimation] = None,
