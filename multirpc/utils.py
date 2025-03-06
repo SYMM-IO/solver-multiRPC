@@ -9,7 +9,7 @@ from threading import Thread
 from typing import Any, Dict, List, Tuple, Union
 
 import aiohttp.client_exceptions
-from aiohttp import ClientTimeout
+from aiohttp import ClientSession, ClientTimeout
 from eth_typing import URI
 from web3 import AsyncHTTPProvider, AsyncWeb3, Web3, WebSocketProvider
 from web3._utils.http import DEFAULT_HTTP_TIMEOUT
@@ -156,9 +156,11 @@ class MultiRpcHTTPSessionManager(HTTPSessionManager):
             self, endpoint_uri: URI, data: Union[bytes, Dict[str, Any]], **kwargs: Any
     ) -> bytes:
         kwargs.setdefault("timeout", ClientTimeout(DEFAULT_HTTP_TIMEOUT))
-        session = await self.async_cache_and_return_session(
-            endpoint_uri, request_timeout=kwargs["timeout"]
-        )
+
+        session = ClientSession(raise_for_status=True)
+        # session = await self.async_cache_and_return_session(      # fixme: original code
+        #     endpoint_uri, request_timeout=kwargs["timeout"]
+        # )
 
         try:
             self.logger.debug(f'making post request, {endpoint_uri=}, {kwargs=}')
@@ -174,9 +176,12 @@ class MultiRpcHTTPSessionManager(HTTPSessionManager):
             self, endpoint_uri: URI, *args: Any, **kwargs: Any
     ) -> Dict[str, Any]:
         kwargs.setdefault("timeout", ClientTimeout(DEFAULT_HTTP_TIMEOUT))
-        session = await self.async_cache_and_return_session(
-            endpoint_uri, request_timeout=kwargs["timeout"]
-        )
+
+        session = ClientSession(raise_for_status=True)
+        # session = await self.async_cache_and_return_session(      # fixme: original code
+        #     endpoint_uri, request_timeout=kwargs["timeout"]
+        # )
+
         try:
             response = await session.get(endpoint_uri, *args, **kwargs)
             response.raise_for_status()
