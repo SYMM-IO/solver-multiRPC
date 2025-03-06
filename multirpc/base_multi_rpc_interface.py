@@ -24,7 +24,7 @@ from .exceptions import (DontHaveThisRpcType, FailedOnAllRPCs, GetBlockFailed, N
                          TransactionFailedStatus, TransactionValueError, Web3InterfaceException)
 from .gas_estimation import GasEstimation, GasEstimationMethod
 from .tx_trace import TxTrace
-from .utils import NestedDict, ResultEvent, TxPriority, calculate_chain_id, create_web3_from_rpc, \
+from .utils import NestedDict, ResultEvent, TxPriority, get_chain_id, create_web3_from_rpc, \
     get_span_proper_label_from_provider, get_unix_time, reduce_list_of_list
 
 T = TypeVar("T")
@@ -112,7 +112,7 @@ class BaseMultiRpc(ABC):
 
     async def setup(self) -> None:
         self.providers = await create_web3_from_rpc(self.rpc_urls, self.is_proof_authority)
-        self.chain_id = await calculate_chain_id(self.providers)
+        self.chain_id = await get_chain_id(self.providers)
 
         if self.gas_estimation is None and self.providers.get('transaction'):
             self.gas_estimation = GasEstimation(

@@ -14,7 +14,7 @@ from eth_typing import URI
 from web3 import AsyncHTTPProvider, AsyncWeb3, Web3, WebSocketProvider
 from web3._utils.http import DEFAULT_HTTP_TIMEOUT
 from web3._utils.http_session_manager import HTTPSessionManager
-from web3.middleware import ExtraDataToPOAMiddleware
+from web3.middleware import ExtraDataToPOAMiddleware, Web3Middleware
 
 from .constants import MaxRPCInEachBracket, MultiRPCLogger
 from .exceptions import AtLastProvideOneValidRPCInEachBracket, MaximumRPCInEachBracketReached
@@ -202,6 +202,48 @@ class MultiRpcAsyncHTTPProvider(AsyncHTTPProvider):
         self._request_session_manager = MultiRpcHTTPSessionManager()
 
 
+class SimpleCacheMiddleware(Web3Middleware):
+    rpc_whitelist = {
+        "web3_clientVersion",
+        "net_version",
+        "eth_chainId",
+    }
+
+    def __init__(self, w3):
+        super().__init__(w3)
+        self.cache = {}
+
+    def wrap_make_request(self, make_request):
+        def middleware(method, params: Any):
+            cache_key = (method, tuple(params))
+            if method in self.rpc_whitelist and cache_key in self.cache:
+                return self.cache[cache_key]  # Return cached response
+
+            response = make_request(method, params)  # Make actual RPC request
+
+            if method in self.rpc_whitelist:
+                self.cache[cache_key] = response  # Store response in cache
+
+            return response
+
+        return middleware
+
+    async def async_wrap_make_request(self, make_request):
+        async def middleware(method, params: Any):
+            cache_key = (method, tuple(params))
+            if method in self.rpc_whitelist and cache_key in self.cache:
+                return self.cache[cache_key]  # Return cached response
+
+            response = await make_request(method, params)  # Make actual RPC request
+
+            if method in self.rpc_whitelist:
+                self.cache[cache_key] = response  # Store response in cache
+
+            return response
+
+        return middleware
+
+
 async def create_web3_from_rpc(rpc_urls: NestedDict, is_proof_of_authority: bool) -> NestedDict:
     async def create_web3(rpc_: str):
         async_w3: AsyncWeb3
@@ -211,6 +253,7 @@ async def create_web3_from_rpc(rpc_urls: NestedDict, is_proof_of_authority: bool
             async_w3 = AsyncWeb3(WebSocketProvider(rpc_))
         if is_proof_of_authority:
             async_w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
+        async_w3.middleware_onion.add(SimpleCacheMiddleware, 'simple_cache')
         try:
             status = await async_w3.is_connected()
         except (asyncio.exceptions.TimeoutError, aiohttp.client_exceptions.ClientResponseError):
@@ -239,7 +282,7 @@ async def create_web3_from_rpc(rpc_urls: NestedDict, is_proof_of_authority: bool
     return providers
 
 
-async def calculate_chain_id(providers: NestedDict) -> int:
+async def get_chain_id(providers: NestedDict) -> int:
     last_error = None
     for key, providers in providers.items():
         for provider in providers:
