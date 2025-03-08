@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "solver-multirpc"
-version = "3.1.7"
+version = "3.1.8"
 description = "A robust Python library for interacting with Ethereum smart contracts via multiple RPC endpoints, ensuring reliability, availability, and load distribution with automatic retries on failure."
 authors = ["rorschach <rorschach45001@gmail.com>"]
 license = "MIT"
