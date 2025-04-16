@@ -5,6 +5,8 @@ BaseException_ = Exception
 
 class Web3InterfaceException(BaseException_):
     def __str__(self):
+        if not self.args:
+            return f"{self.__class__.__name__}()"
         return f"{self.__class__.__name__}({self.args[0]})"
 
 
