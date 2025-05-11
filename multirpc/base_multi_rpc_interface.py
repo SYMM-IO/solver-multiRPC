@@ -16,7 +16,7 @@ from requests import ConnectionError, HTTPError, ReadTimeout
 from web3 import AsyncWeb3, Web3
 from web3._utils.contracts import encode_transaction_data  # noqa
 from web3.contract import Contract
-from web3.exceptions import BadResponseFormat, BlockNotFound, TimeExhausted, TransactionNotFound
+from web3.exceptions import BadResponseFormat, BlockNotFound, TimeExhausted, TransactionNotFound, Web3RPCError
 from web3.types import BlockData, BlockIdentifier, TxReceipt
 
 from .constants import EstimateGasLimitBuffer, GasLimit, GasUpperBound, MultiRPCLogger, ViewPolicy
@@ -311,7 +311,7 @@ class BaseMultiRpc(ABC):
             self._logger_params(**{f"{rpc_label_prefix}_post_send_time": get_unix_time()})
             self._logger_params(tx_send_time=int(time.time() * 1000))
             return provider, transaction
-        except ValueError as e:
+        except (ValueError, Web3RPCError) as e:
             MultiRPCLogger.error(f"RPC({rpc_url}) value error: {str(e)}")
             t_bnb_flag = "transaction would cause overdraft" in str(e).lower() and (await provider.eth.chain_id) == 97
             if not (
@@ -492,7 +492,7 @@ class BaseMultiRpc(ABC):
         ]
         result = await self.__execute_batch_tasks(
             execution_tx_list,
-            [ValueError, ConnectionError, ReadTimeout, HTTPError],
+            [ValueError, ConnectionError, ReadTimeout, HTTPError, Web3RPCError],
             FailedOnAllRPCs
         )
         provider, tx = result
