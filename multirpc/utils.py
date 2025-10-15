@@ -294,7 +294,7 @@ class ChainConfigTest:
         if self.multicall_address:
             self.multicall_address = Web3.to_checksum_address(self.multicall_address)
 
-def custom_error_mapper(func):
+def custom_error_mapper(func):  # fixme-mba why is it on this branch?
     """
     - this decorator is used to map custom errors defined in self.custom_error_map.
     - **note**: should be used only on class that has self.custom_error_map attribute

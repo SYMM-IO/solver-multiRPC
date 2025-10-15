@@ -124,7 +124,7 @@ class BaseMultiRpc(ABC):
         else:
             self.is_flash_block = False
 
-        MultiRPCLogger.info(f"{self.chain_id=}, {self.is_flash_block=}")
+        MultiRPCLogger.info(f"{self.chain_id=}, {self.is_flash_block=}")  # fixme-mba info -> debug?
 
         if self.gas_estimation is None and self.providers.get('transaction'):
             self.gas_estimation = GasEstimation(
@@ -208,7 +208,7 @@ class BaseMultiRpc(ABC):
 
     async def _call_view_function(self,
                                   func_name: str,
-                                  block_identifier: Union[str, int],
+                                  block_identifier: Union[str, int],  # fixme-mba = None
                                   use_multicall=False,
                                   *args, **kwargs):
         """
@@ -307,7 +307,7 @@ class BaseMultiRpc(ABC):
             account: LocalAccount = Account.from_key(signer_private_key)
             if enable_estimate_gas_limit:
                 del tx['gas']
-                estimate_gas = await provider.eth.estimate_gas(tx)
+                estimate_gas = await provider.eth.estimate_gas(tx)   # fixme-mba get_block_identifier?
                 MultiRPCLogger.info(f"gas_estimation({estimate_gas} gas needed) is successful")
                 return account.sign_transaction({**tx, 'gas': int(estimate_gas * EstimateGasLimitBuffer)})
             return account.sign_transaction(tx)
@@ -589,7 +589,7 @@ class BaseMultiRpc(ABC):
                 raise
         raise last_exception
 
-    async def get_block(self, block_identifier: BlockIdentifier,
+    async def get_block(self, block_identifier: BlockIdentifier,  # fixme-mba = None
                         full_transactions: bool = False) -> BlockData:
         self.check_for_view()
 

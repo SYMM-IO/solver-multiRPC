@@ -57,14 +57,14 @@ class AsyncMultiRpc(BaseMultiRpc):
 
     async def get_nonce(self, address: Union[Address, ChecksumAddress, str],
                         block_identifier: BlockIdentifier = None) -> int:
-        return await super()._get_nonce(address, self.get_block_identifier(block_identifier))
+        return await super()._get_nonce(address, self.get_block_identifier(block_identifier))  # fixme-mba why get_block_identifier here?
 
     async def get_tx_receipt(self, tx_hash) -> TxReceipt:
         return await super().get_tx_receipt(tx_hash)
 
     async def get_block(self, block_identifier: BlockIdentifier = None,
                         full_transactions: bool = False) -> BlockData:
-        return await super().get_block(self.get_block_identifier(block_identifier), full_transactions)
+        return await super().get_block(self.get_block_identifier(block_identifier), full_transactions)  # fixme-mba why get_block_identifier here?
 
     async def get_block_number(self) -> int:
         return await super().get_block_number()
@@ -92,7 +92,7 @@ class AsyncMultiRpc(BaseMultiRpc):
                 raise DontHaveThisRpcType(f"Doesn't have {self.typ} RPCs")
             if self.typ == ContractFunctionType.View:
                 return await self.mr._call_view_function(
-                    self.name, self.mr.get_block_identifier(block_identifier), False,
+                    self.name, self.mr.get_block_identifier(block_identifier), False,  # fixme-mba why get_block_identifier here?
                     *self.args, **self.kwargs,
                 )
             elif self.typ == ContractFunctionType.Transaction:
@@ -120,7 +120,7 @@ class AsyncMultiRpc(BaseMultiRpc):
                 raise KwargsNotSupportedInMultiCall
             if self.typ == ContractFunctionType.View:
                 return await self.mr._call_view_function(
-                    self.name, self.mr.get_block_identifier(block_identifier), True,
+                    self.name, self.mr.get_block_identifier(block_identifier), True,  # fixme-mba why get_block_identifier here?
                     *self.args, **self.kwargs,
                 )
             elif self.typ == ContractFunctionType.Transaction:

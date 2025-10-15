@@ -62,7 +62,7 @@ class MultiRpc(BaseMultiRpc):
     @thread_safe
     def get_nonce(self, address: Union[Address, ChecksumAddress, str],
                   block_identifier: BlockIdentifier = None) -> int:
-        return asyncio.run(super()._get_nonce(address, self.get_block_identifier(block_identifier)))
+        return asyncio.run(super()._get_nonce(address, self.get_block_identifier(block_identifier)))  # fixme-mba why get_block_identifier here?
 
     @thread_safe
     def get_tx_receipt(self, tx_hash) -> TxReceipt:
@@ -70,7 +70,7 @@ class MultiRpc(BaseMultiRpc):
 
     @thread_safe
     def get_block(self, block_identifier: BlockIdentifier = None, full_transactions: bool = False) -> BlockData:
-        return asyncio.run(super().get_block(self.get_block_identifier(block_identifier), full_transactions))
+        return asyncio.run(super().get_block(self.get_block_identifier(block_identifier), full_transactions))  # fixme-mba why get_block_identifier here?
 
     @thread_safe
     def get_block_number(self) -> int:
@@ -97,7 +97,7 @@ class MultiRpc(BaseMultiRpc):
                 enable_estimate_gas_limit: Optional[bool] = None,
                 use_multicall=False,
         ):
-            block_identifier = self.mr.get_block_identifier(block_identifier)
+            block_identifier = self.mr.get_block_identifier(block_identifier)  # fixme-mba why get_block_identifier here?
             if self.mr.providers.get(self.typ) is None:
                 raise DontHaveThisRpcType(f"Doesn't have {self.typ} RPCs")
             if self.typ == ContractFunctionType.View:
@@ -117,7 +117,7 @@ class MultiRpc(BaseMultiRpc):
                     priority=priority,
                     gas_estimation_method=gas_estimation_method,
                     enable_estimate_gas_limit=enable_estimate_gas_limit,
-                    block_identifier=block_identifier,
+                    block_identifier=block_identifier,  # fixme-mba ?
                 ))
 
         @thread_safe
@@ -131,7 +131,7 @@ class MultiRpc(BaseMultiRpc):
                 raise KwargsNotSupportedInMultiCall
             if self.typ == ContractFunctionType.View:
                 return asyncio.run(self.mr._call_view_function(
-                    self.name, self.mr.get_block_identifier(block_identifier), True,
+                    self.name, self.mr.get_block_identifier(block_identifier), True,  # fixme-mba why get_block_identifier here?
                     *self.args, **self.kwargs,
                 ))
             elif self.typ == ContractFunctionType.Transaction:
