@@ -55,8 +55,9 @@ class AsyncMultiRpc(BaseMultiRpc):
         if setup_on_init:
             asyncio.run(self.setup())
 
-    async def get_nonce(self, address: Union[Address, ChecksumAddress, str]) -> int:
-        return await super()._get_nonce(address)
+    async def get_nonce(self, address: Union[Address, ChecksumAddress, str],
+                        block_identifier: BlockIdentifier = None) -> int:
+        return await super()._get_nonce(address, self.get_block_identifier(block_identifier))
 
     async def get_tx_receipt(self, tx_hash) -> TxReceipt:
         return await super().get_tx_receipt(tx_hash)

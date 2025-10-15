@@ -60,8 +60,9 @@ class MultiRpc(BaseMultiRpc):
         return asyncio.run(super().setup())
 
     @thread_safe
-    def get_nonce(self, address: Union[Address, ChecksumAddress, str]) -> int:
-        return asyncio.run(super()._get_nonce(address))
+    def get_nonce(self, address: Union[Address, ChecksumAddress, str],
+                  block_identifier: BlockIdentifier = None) -> int:
+        return asyncio.run(super()._get_nonce(address, self.get_block_identifier(block_identifier)))
 
     @thread_safe
     def get_tx_receipt(self, tx_hash) -> TxReceipt:
@@ -96,12 +97,12 @@ class MultiRpc(BaseMultiRpc):
                 enable_estimate_gas_limit: Optional[bool] = None,
                 use_multicall=False,
         ):
+            block_identifier = self.mr.get_block_identifier(block_identifier)
             if self.mr.providers.get(self.typ) is None:
                 raise DontHaveThisRpcType(f"Doesn't have {self.typ} RPCs")
             if self.typ == ContractFunctionType.View:
                 return asyncio.run(self.mr._call_view_function(
-                    self.name, self.mr.get_block_identifier(block_identifier), use_multicall,
-                    *self.args, **self.kwargs,
+                    self.name, block_identifier, use_multicall, *self.args, **self.kwargs,
                 ))
             elif self.typ == ContractFunctionType.Transaction:
                 return asyncio.run(self.mr._call_tx_function(
@@ -115,7 +116,8 @@ class MultiRpc(BaseMultiRpc):
                     wait_for_receipt=wait_for_receipt,
                     priority=priority,
                     gas_estimation_method=gas_estimation_method,
-                    enable_estimate_gas_limit=enable_estimate_gas_limit
+                    enable_estimate_gas_limit=enable_estimate_gas_limit,
+                    block_identifier=block_identifier,
                 ))
 
         @thread_safe
