@@ -17,7 +17,8 @@ from web3._utils.http_session_manager import HTTPSessionManager
 from web3.middleware import ExtraDataToPOAMiddleware
 
 from .constants import MaxRPCInEachBracket, MultiRPCLogger
-from .exceptions import AtLastProvideOneValidRPCInEachBracket, MaximumRPCInEachBracketReached
+from .exceptions import AllRPCShouldSupportFlashBlockOrNot, AtLastProvideOneValidRPCInEachBracket, \
+    MaximumRPCInEachBracketReached
 
 
 def get_span_proper_label_from_provider(endpoint_uri):
@@ -202,6 +203,24 @@ class MultiRpcAsyncHTTPProvider(AsyncHTTPProvider):
         self._request_session_manager = MultiRpcHTTPSessionManager()
 
 
+async def is_flash_block_supported(providers: NestedDict) -> bool:
+    rpc_flash_block_support: dict[str, bool] = {}
+    for key, providers in providers.items():
+        for provider in providers:
+            block = await provider.eth.get_block("pending")
+            flash_block_support = block.get('miner') not in [None, '0x0000000000000000000000000000000000000000']
+            rpc_flash_block_support[provider.provider.endpoint_uri] = flash_block_support
+
+    flash_block_supported = None
+    for rpc, is_flash_block in rpc_flash_block_support.items():
+        if flash_block_supported is None:
+            flash_block_supported = is_flash_block
+        elif flash_block_supported != is_flash_block:
+            raise AllRPCShouldSupportFlashBlockOrNot(f"You can't have combination of rpc supporting "
+                                                     f"flashblock and not supporting, {rpc_flash_block_support=}")
+
+    return flash_block_supported
+
 async def create_web3_from_rpc(rpc_urls: NestedDict, is_proof_of_authority: bool) -> NestedDict:
     async def create_web3(rpc_: str):
         async_w3: AsyncWeb3
@@ -274,3 +293,40 @@ class ChainConfigTest:
         self.contract_address = Web3.to_checksum_address(self.contract_address)
         if self.multicall_address:
             self.multicall_address = Web3.to_checksum_address(self.multicall_address)
+
+def custom_error_mapper(func):
+    """
+    - this decorator is used to map custom errors defined in self.custom_error_map.
+    - **note**: should be used only on class that has self.custom_error_map attribute
+    """
+
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        try:
+            res = func(self, *args, **kwargs)
+            return res
+        except Exception as e:
+            if not hasattr(self, "custom_error_map") or not isinstance(self.custom_error_map, dict):
+                raise e
+            custom_error_map = self.custom_error_map
+            if (custom_e := custom_error_map.get(e.__class__.__name__)) is not None:
+                raise custom_e from e
+            raise e
+
+    @wraps(func)
+    async def async_wrapper(self, *args, **kwargs):
+        try:
+            res = await func(self, *args, **kwargs)
+            return res
+        except Exception as e:
+            if not hasattr(self, "custom_error_map") or not isinstance(self.custom_error_map, dict):
+                raise e
+            custom_error_map = self.custom_error_map
+            if (custom_e := custom_error_map.get(e.__class__.__name__)) is not None:
+                raise custom_e from e
+            raise e
+
+    if asyncio.iscoroutinefunction(func):
+        return async_wrapper
+
+    return wrapper

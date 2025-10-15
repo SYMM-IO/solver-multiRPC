@@ -39,10 +39,14 @@ BaseConfig = ChainConfigTest(
     '0x1d58e7F58d085c87E34b18DAe5A6D08d187cbcbe',
     NestedDict({
         "view": {
-            1: ['https://base-rpc.publicnode.com', 'https://base.drpc.org'],
+            1: ['https://base.drpc.org', 'https://mainnet-preconf.base.org',
+                # 'https://base.gateway.tenderly.co'
+                ],
         },
         "transaction": {
-            1: ['https://base-rpc.publicnode.com', 'https://base.drpc.org'],
+            1: ['https://base.drpc.org', 'https://mainnet-preconf.base.org',
+                # 'https://base.gateway.tenderly.co'
+                ],
         }
     }),
     '0xbd342d36d503af057cd79fd4f252b4629d6013d0748a2742dc99c9fcbe522072',

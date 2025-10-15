@@ -54,6 +54,9 @@ class MaximumRPCInEachBracketReached(Web3InterfaceException):
 class AtLastProvideOneValidRPCInEachBracket(Web3InterfaceException):
     pass
 
+class AllRPCShouldSupportFlashBlockOrNot(Web3InterfaceException):
+    pass
+
 
 class TransactionValueError(Web3InterfaceException):
     pass

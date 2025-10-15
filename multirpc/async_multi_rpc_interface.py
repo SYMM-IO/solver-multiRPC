@@ -61,9 +61,9 @@ class AsyncMultiRpc(BaseMultiRpc):
     async def get_tx_receipt(self, tx_hash) -> TxReceipt:
         return await super().get_tx_receipt(tx_hash)
 
-    async def get_block(self, block_identifier: BlockIdentifier = 'latest',
+    async def get_block(self, block_identifier: BlockIdentifier = None,
                         full_transactions: bool = False) -> BlockData:
-        return await super().get_block(block_identifier, full_transactions)
+        return await super().get_block(self.get_block_identifier(block_identifier), full_transactions)
 
     async def get_block_number(self) -> int:
         return await super().get_block_number()
@@ -84,14 +84,15 @@ class AsyncMultiRpc(BaseMultiRpc):
                 wait_for_receipt: int = 90,
                 priority: TxPriority = TxPriority.Low,
                 gas_estimation_method: GasEstimationMethod = None,
-                block_identifier: Union[str, int] = 'latest',
+                block_identifier: Union[str, int] = None,
                 enable_estimate_gas_limit: Optional[bool] = None,
         ):
             if self.mr.providers.get(self.typ) is None:
                 raise DontHaveThisRpcType(f"Doesn't have {self.typ} RPCs")
             if self.typ == ContractFunctionType.View:
                 return await self.mr._call_view_function(
-                    self.name, block_identifier, False, *self.args, **self.kwargs,
+                    self.name, self.mr.get_block_identifier(block_identifier), False,
+                    *self.args, **self.kwargs,
                 )
             elif self.typ == ContractFunctionType.Transaction:
                 return await self.mr._call_tx_function(
@@ -110,7 +111,7 @@ class AsyncMultiRpc(BaseMultiRpc):
 
         async def multicall(
                 self,
-                block_identifier: Union[str, int] = 'latest',
+                block_identifier: Union[str, int] = None,
         ):
             if self.mr.providers.get(self.typ) is None:
                 raise DontHaveThisRpcType(f"Doesn't have {self.typ} RPCs")
@@ -118,7 +119,8 @@ class AsyncMultiRpc(BaseMultiRpc):
                 raise KwargsNotSupportedInMultiCall
             if self.typ == ContractFunctionType.View:
                 return await self.mr._call_view_function(
-                    self.name, block_identifier, True, *self.args, **self.kwargs,
+                    self.name, self.mr.get_block_identifier(block_identifier), True,
+                    *self.args, **self.kwargs,
                 )
             elif self.typ == ContractFunctionType.Transaction:
                 raise TransactionTypeNotSupportedInMultiCall
