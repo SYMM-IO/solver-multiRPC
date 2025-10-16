@@ -25,7 +25,7 @@ from .exceptions import (DontHaveThisRpcType, FailedOnAllRPCs, GetBlockFailed, N
                          TransactionFailedStatus, TransactionValueError, Web3InterfaceException)
 from .gas_estimation import GasEstimation, GasEstimationMethod
 from .tx_trace import TxTrace
-from .utils import NestedDict, ResultEvent, TxPriority, get_chain_id, create_web3_from_rpc, \
+from .utils import NestedDict, ResultEvent, TxPriority, create_web3_from_rpc, get_chain_id, \
     get_span_proper_label_from_provider, get_unix_time, is_flash_block_supported, reduce_list_of_list
 
 T = TypeVar("T")
@@ -101,7 +101,7 @@ class BaseMultiRpc(ABC):
         else:
             MultiRPCLogger.info(f'params={kwargs}')
 
-    def get_block_identifier(self, block_identifier):
+    def get_block_identifier(self, block_identifier=None):
         return block_identifier or ('pending' if self.is_flash_block else 'latest')
 
     def set_account(self, address: Union[ChecksumAddress, str], private_key: str) -> None:
@@ -124,7 +124,7 @@ class BaseMultiRpc(ABC):
         else:
             self.is_flash_block = False
 
-        MultiRPCLogger.info(f"{self.chain_id=}, {self.is_flash_block=}")  # fixme-mba info -> debug?
+        MultiRPCLogger.debug(f"{self.chain_id=}, {self.is_flash_block=}")
 
         if self.gas_estimation is None and self.providers.get('transaction'):
             self.gas_estimation = GasEstimation(
@@ -208,7 +208,7 @@ class BaseMultiRpc(ABC):
 
     async def _call_view_function(self,
                                   func_name: str,
-                                  block_identifier: Union[str, int],  # fixme-mba = None
+                                  block_identifier: Union[str, int] = None,
                                   use_multicall=False,
                                   *args, **kwargs):
         """
@@ -234,6 +234,7 @@ class BaseMultiRpc(ABC):
                 return results[max_index][2]
             return results[max_index][2][0]
 
+        block_identifier = self.get_block_identifier(block_identifier)
         last_error = None
         for contracts, multi_calls in zip(self.contracts['view'].values(),
                                           self.multi_calls['view'].values()):  # type: any, List[AsyncMulticall]
@@ -307,7 +308,7 @@ class BaseMultiRpc(ABC):
             account: LocalAccount = Account.from_key(signer_private_key)
             if enable_estimate_gas_limit:
                 del tx['gas']
-                estimate_gas = await provider.eth.estimate_gas(tx)   # fixme-mba get_block_identifier?
+                estimate_gas = await provider.eth.estimate_gas(tx, block_identifier=self.get_block_identifier())
                 MultiRPCLogger.info(f"gas_estimation({estimate_gas} gas needed) is successful")
                 return account.sign_transaction({**tx, 'gas': int(estimate_gas * EstimateGasLimitBuffer)})
             return account.sign_transaction(tx)
@@ -589,9 +590,9 @@ class BaseMultiRpc(ABC):
                 raise
         raise last_exception
 
-    async def get_block(self, block_identifier: BlockIdentifier,  # fixme-mba = None
-                        full_transactions: bool = False) -> BlockData:
+    async def get_block(self, block_identifier: BlockIdentifier = None, full_transactions: bool = False) -> BlockData:
         self.check_for_view()
+        block_identifier = self.get_block_identifier(block_identifier)
 
         exceptions = (HTTPError, ConnectionError, ReadTimeout, ValueError, TimeExhausted, BlockNotFound)
         last_exception = None
