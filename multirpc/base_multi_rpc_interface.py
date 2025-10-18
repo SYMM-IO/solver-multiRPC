@@ -91,8 +91,8 @@ class BaseMultiRpc(ABC):
         self.address = None
         self.private_key = None
         self.chain_id = None
-        self.is_flash_block = None
-
+        self.is_flash_block = None  # fixme-mba is_flash_block -> is_flash_block_aware and get it from input arguments
+        # fixme-mba is_flash_block_aware or chain_id in FlashBlockSupportedChains
         MultiRPCLogger.setLevel(log_level)
 
     def _logger_params(self, **kwargs) -> None:
@@ -120,7 +120,7 @@ class BaseMultiRpc(ABC):
         self.chain_id = await get_chain_id(self.providers)
 
         if self.chain_id in FlashBlockSupportedChains:
-            self.is_flash_block = await is_flash_block_supported(self.providers)
+            self.is_flash_block = await is_flash_block_supported(self.providers)  # fixme-mba remove is_flash_block_supported
         else:
             self.is_flash_block = False
 
@@ -259,7 +259,7 @@ class BaseMultiRpc(ABC):
         last_error = None
         for providers in providers_4_nonce.values():
             execution_list = [
-                prov.eth.get_transaction_count(address, block_identifier=block_identifier) for prov in providers
+                prov.eth.get_transaction_count(address, block_identifier=block_identifier) for prov in providers  # fixme-mba get_block_identifier
             ]
             try:
                 return await self.__gather_tasks(execution_list, max)
@@ -592,7 +592,7 @@ class BaseMultiRpc(ABC):
 
     async def get_block(self, block_identifier: BlockIdentifier = None, full_transactions: bool = False) -> BlockData:
         self.check_for_view()
-        block_identifier = self.get_block_identifier(block_identifier)
+        block_identifier = self.get_block_identifier(block_identifier)  # fixme-mba extra var
 
         exceptions = (HTTPError, ConnectionError, ReadTimeout, ValueError, TimeExhausted, BlockNotFound)
         last_exception = None
