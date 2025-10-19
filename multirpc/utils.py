@@ -17,7 +17,8 @@ from web3._utils.http_session_manager import HTTPSessionManager
 from web3.middleware import ExtraDataToPOAMiddleware
 
 from .constants import MaxRPCInEachBracket, MultiRPCLogger
-from .exceptions import AtLastProvideOneValidRPCInEachBracket, MaximumRPCInEachBracketReached
+from .exceptions import AtLastProvideOneValidRPCInEachBracket, \
+    MaximumRPCInEachBracketReached
 
 
 def get_span_proper_label_from_provider(endpoint_uri):

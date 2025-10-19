@@ -34,12 +34,13 @@ class AsyncMultiRpc(BaseMultiRpc):
             is_proof_authority: bool = False,
             multicall_custom_address: str = None,
             log_level: logging = logging.WARN,
-            setup_on_init: bool = True
+            setup_on_init: bool = True,
+            is_flash_block_aware: Optional[bool] = None
     ):
         super().__init__(rpc_urls, contract_address, contract_abi, rpcs_supporting_tx_trace,
                          view_policy, gas_estimation, gas_limit,
                          gas_upper_bound, apm, enable_estimate_gas_limit,
-                         is_proof_authority, multicall_custom_address, log_level)
+                         is_proof_authority, multicall_custom_address, log_level, is_flash_block_aware)
 
         for func_abi in self.contract_abi:
             if func_abi.get("stateMutability") in ("view", "pure"):
@@ -55,13 +56,14 @@ class AsyncMultiRpc(BaseMultiRpc):
         if setup_on_init:
             asyncio.run(self.setup())
 
-    async def get_nonce(self, address: Union[Address, ChecksumAddress, str]) -> int:
-        return await super()._get_nonce(address)
+    async def get_nonce(self, address: Union[Address, ChecksumAddress, str],
+                        block_identifier: BlockIdentifier = None) -> int:
+        return await super()._get_nonce(address, block_identifier)
 
     async def get_tx_receipt(self, tx_hash) -> TxReceipt:
         return await super().get_tx_receipt(tx_hash)
 
-    async def get_block(self, block_identifier: BlockIdentifier = 'latest',
+    async def get_block(self, block_identifier: BlockIdentifier = None,
                         full_transactions: bool = False) -> BlockData:
         return await super().get_block(block_identifier, full_transactions)
 
@@ -84,7 +86,7 @@ class AsyncMultiRpc(BaseMultiRpc):
                 wait_for_receipt: int = 90,
                 priority: TxPriority = TxPriority.Low,
                 gas_estimation_method: GasEstimationMethod = None,
-                block_identifier: Union[str, int] = 'latest',
+                block_identifier: Union[str, int] = None,
                 enable_estimate_gas_limit: Optional[bool] = None,
         ):
             if self.mr.providers.get(self.typ) is None:
@@ -110,7 +112,7 @@ class AsyncMultiRpc(BaseMultiRpc):
 
         async def multicall(
                 self,
-                block_identifier: Union[str, int] = 'latest',
+                block_identifier: Union[str, int] = None,
         ):
             if self.mr.providers.get(self.typ) is None:
                 raise DontHaveThisRpcType(f"Doesn't have {self.typ} RPCs")
