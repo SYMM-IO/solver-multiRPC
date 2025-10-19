@@ -34,12 +34,13 @@ class MultiRpc(BaseMultiRpc):
             is_proof_authority: bool = False,
             multicall_custom_address: str = None,
             log_level: logging = logging.WARN,
-            setup_on_init: bool = True
+            setup_on_init: bool = True,
+            is_flash_block_aware: Optional[bool] = None
     ):
         super().__init__(rpc_urls, contract_address, contract_abi, rpcs_supporting_tx_trace,
                          view_policy, gas_estimation, gas_limit,
                          gas_upper_bound, apm, enable_estimate_gas_limit,
-                         is_proof_authority, multicall_custom_address, log_level)
+                         is_proof_authority, multicall_custom_address, log_level, is_flash_block_aware)
 
         for func_abi in self.contract_abi:
             if func_abi.get("stateMutability") in ("view", "pure"):

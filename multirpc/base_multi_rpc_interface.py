@@ -26,7 +26,7 @@ from .exceptions import (DontHaveThisRpcType, FailedOnAllRPCs, GetBlockFailed, N
 from .gas_estimation import GasEstimation, GasEstimationMethod
 from .tx_trace import TxTrace
 from .utils import NestedDict, ResultEvent, TxPriority, create_web3_from_rpc, get_chain_id, \
-    get_span_proper_label_from_provider, get_unix_time, is_flash_block_supported, reduce_list_of_list
+    get_span_proper_label_from_provider, get_unix_time, reduce_list_of_list
 
 T = TypeVar("T")
 
@@ -50,7 +50,8 @@ class BaseMultiRpc(ABC):
             enable_estimate_gas_limit: bool = False,
             is_proof_authority: bool = False,
             multicall_custom_address: str = None,
-            log_level: logging = logging.WARN
+            log_level: logging = logging.WARN,
+            is_flash_block_aware: Optional[bool] = None
     ):
         """
         Args:
@@ -91,8 +92,7 @@ class BaseMultiRpc(ABC):
         self.address = None
         self.private_key = None
         self.chain_id = None
-        self.is_flash_block = None  # fixme-mba is_flash_block -> is_flash_block_aware and get it from input arguments
-        # fixme-mba is_flash_block_aware or chain_id in FlashBlockSupportedChains
+        self.is_flash_block_aware = is_flash_block_aware
         MultiRPCLogger.setLevel(log_level)
 
     def _logger_params(self, **kwargs) -> None:
@@ -102,7 +102,7 @@ class BaseMultiRpc(ABC):
             MultiRPCLogger.info(f'params={kwargs}')
 
     def get_block_identifier(self, block_identifier=None):
-        return block_identifier or ('pending' if self.is_flash_block else 'latest')
+        return block_identifier or ('pending' if self.is_flash_block_aware else 'latest')
 
     def set_account(self, address: Union[ChecksumAddress, str], private_key: str) -> None:
         """
@@ -119,12 +119,10 @@ class BaseMultiRpc(ABC):
         self.providers = await create_web3_from_rpc(self.rpc_urls, self.is_proof_authority)
         self.chain_id = await get_chain_id(self.providers)
 
-        if self.chain_id in FlashBlockSupportedChains:
-            self.is_flash_block = await is_flash_block_supported(self.providers)  # fixme-mba remove is_flash_block_supported
-        else:
-            self.is_flash_block = False
+        if self.is_flash_block_aware is None:
+            self.is_flash_block_aware = self.chain_id in FlashBlockSupportedChains
 
-        MultiRPCLogger.debug(f"{self.chain_id=}, {self.is_flash_block=}")
+        MultiRPCLogger.debug(f"{self.chain_id=}, {self.is_flash_block_aware=}")
 
         if self.gas_estimation is None and self.providers.get('transaction'):
             self.gas_estimation = GasEstimation(
@@ -259,7 +257,8 @@ class BaseMultiRpc(ABC):
         last_error = None
         for providers in providers_4_nonce.values():
             execution_list = [
-                prov.eth.get_transaction_count(address, block_identifier=block_identifier) for prov in providers  # fixme-mba get_block_identifier
+                prov.eth.get_transaction_count(address, block_identifier=self.get_block_identifier(block_identifier))
+                for prov in providers
             ]
             try:
                 return await self.__gather_tasks(execution_list, max)
@@ -592,12 +591,13 @@ class BaseMultiRpc(ABC):
 
     async def get_block(self, block_identifier: BlockIdentifier = None, full_transactions: bool = False) -> BlockData:
         self.check_for_view()
-        block_identifier = self.get_block_identifier(block_identifier)  # fixme-mba extra var
 
         exceptions = (HTTPError, ConnectionError, ReadTimeout, ValueError, TimeExhausted, BlockNotFound)
         last_exception = None
         for provider in self.providers['view'].values():  # type: List[AsyncWeb3]
-            execution_tx_params_list = [p.eth.get_block(block_identifier, full_transactions) for p in provider]
+            execution_tx_params_list = [
+                p.eth.get_block(self.get_block_identifier(block_identifier), full_transactions) for p in provider
+            ]
             try:
                 return await self.__execute_batch_tasks(
                     execution_tx_params_list,

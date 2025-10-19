@@ -36,7 +36,9 @@ ChainIdToGas = {
 GasFromRpcChainIds = []  # for this chain ids use rpc to estimate gas
 FixedValueGas = 30
 
-FlashBlockSupportedChains = [8453]
+FlashBlockSupportedChains = [
+    8453    # base
+]
 
 MultiRPCLoggerName = 'Multi-RPC'
 GasEstimationLoggerName = MultiRPCLoggerName + '.Gas-Estimation'
